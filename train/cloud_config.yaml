@@ -7,32 +7,38 @@ trainingInput:
     maxTrials: 40
     maxParallelTrials: 1
     params:
-      - parameterName: gin_bindings=DoomEnvironment.frame_skip
+      - parameterName: num_timesteps
         type: INTEGER
-        minValue: 2
+        minValue: 3
         maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: gin_bindings=critic/tf.train.AdamOptimizer.learning_rate
-        type: DOUBLE
-        minValue: 0.00001
-        maxValue: 0.01
-        scaleType: UNIT_LOG_SCALE
-
-      - parameterName: gin_bindings=ppo_kl_penalty_agent.PPOKLPenaltyAgent.adaptive_kl_target
-        type: DOUBLE
-        minValue: 0.001
-        maxValue: 0.1
-        scaleType: UNIT_LOG_SCALE
-
-      - parameterName: gin_bindings=ppo_kl_penalty_agent.PPOKLPenaltyAgent.num_epochs
+      - parameterName: encoded_size
         type: INTEGER
-        minValue: 15
-        maxValue: 40
-        scaleType: UNIT_LINEAR_SCALE
+        minValue: 4
+        maxValue: 64
+        scaleType: UNIT_LOG_SCALE
 
-      - parameterName: gin_bindings=CONV_LAYER_PARAMS
-        type: CATEGORICAL
-        categoricalValues:
-        - "[[16, 3, 2]]"
-        - "[[16, 3, 2], [32, 3, 2]]"
+      - parameterName: batch_size
+        type: INTEGER
+        minValue: 64
+        maxValue: 256
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: learning_rate
+        type: DOUBLE
+        minValue: .0001
+        maxValue: .01
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: reg_amount
+        type: DOUBLE
+        minValue: .0000001
+        maxValue: .001
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: use_residual
+        type: INTEGER
+        minValue: 0
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE

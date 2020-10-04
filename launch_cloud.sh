@@ -13,13 +13,13 @@ BUCKET_ID=visualize-nn-imagination-runs
 PROJECT_ID=visualize-nn-imagination
 JOB_DIR=gs://$BUCKET_ID/$JOB_NAME
 
-gcloud ai-platform jobs submit training JOB_NAME \
+gcloud ai-platform jobs submit training $JOB_NAME \
   --project $PROJECT_ID \
   --package-path train/ \
   --module-name train.train \
   --region us-central1 \
   --python-version 3.7 \
-  --runtime-version 1.15 \
+  --runtime-version 2.2 \
   --job-dir $JOB_DIR \
 
 echo "python3 -m tensorboard.main --logdir $JOB_DIR"

@@ -5,14 +5,18 @@ from absl import app
 from absl import flags
 import os
 
-from visualize_metric import combine_metric
-import visualize_metric
+import train.visualize_metric
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('eval_data_size', 10000, '')
+# flags.DEFINE_integer('eval_data_size', 10000, '')
+# flags.DEFINE_multi_integer('board_size', [20,20], '')
+# flags.DEFINE_integer('eval_interval', 500, '')
+# flags.DEFINE_integer('max_train_steps', 20000, '')
+
+flags.DEFINE_integer('eval_data_size', 100, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
-flags.DEFINE_integer('eval_interval', 500, '')
-flags.DEFINE_integer('max_train_steps', 20000, '')
+flags.DEFINE_integer('eval_interval', 2, '')
+flags.DEFINE_integer('max_train_steps', 4, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 32, '')
@@ -20,6 +24,7 @@ flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', .0001, '')
 flags.DEFINE_integer('use_residual', 0, '')
+
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
@@ -32,7 +37,7 @@ def life_step(X):
 
 def convert_model_in(data):
   data = np.array(data)
-  data = data.astype(int)
+  data = data.astype(np.float32)
   data = np.expand_dims(data, -1)
   return data
 
@@ -198,7 +203,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
 
           model_results = model(eval_datas[:, 0])
           gen_boards = get_gen_boards(decoder, model_results)
-          visualize_metric_result = visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
+          visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
           print("visualize_metric_result", visualize_metric_result)
           tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
 
@@ -282,7 +287,7 @@ def main(_):
   gen_boards = get_gen_boards(decoder, model_results)
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
 
-  metric_result = combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
+  metric_result = train.visualize_metric.combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
   print("metric_result", metric_result, flush=True)
 
   writer = tf.summary.create_file_writer(FLAGS.job_dir)
