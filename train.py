@@ -4,7 +4,8 @@ import tensorflow as tf
 from absl import app
 from absl import flags
 
-from metrics import combine_metric
+from visualize_metric import combine_metric
+import visualize_metric
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
@@ -16,6 +17,11 @@ flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 32, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
+flags.DEFINE_float('reg_amount', .0001, '')
+flags.DEFINE_integer('use_residual', 0, '')
+flags.DEFINE_string('job_dir', '',
+                    'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_alias('job-dir', 'job_dir')
 
 
 #Training data functions
@@ -170,7 +176,11 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       disctim_grads = disc_tape.gradient(discriminator_loss, discriminator.trainable_weights)
       discriminator_opt.apply_gradients(zip(disctim_grads, discriminator.trainable_weights))
     
-  def train_model(decoder, indexes_to_train, indexes_to_adver, train_model, stop_acc):
+  def train_model(decoder, indexes_to_train, indexes_to_adver, train_model, stop_acc, metric_prefix):
+    writer = tf.summary.create_file_writer(FLAGS.job_dir)
+    eval_datas = gen_data_batch(int(FLAGS.eval_data_size/10)+1, FLAGS.num_timesteps)
+    non_train_indexies = range(1, FLAGS.num_timesteps)
+
     for name, metric in metrics:
       metric.reset_states()
 
@@ -180,8 +190,19 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
 
       train_step(tf.constant(batch), tf.constant(adver_batch), decoder, indexes_to_train, indexes_to_adver, train_model)
       if step_i % FLAGS.eval_interval == 0:
-        for name, metric in metrics:
-          print(step_i, name, metric.result().numpy())
+        with writer.as_default():
+          for name, metric in metrics:
+            print(step_i, name, metric.result().numpy())
+            tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
+
+          model_results = model(eval_datas[:, 0])
+          gen_boards = get_gen_boards(decoder, model_results)
+          visualize_metric_result = visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
+          print("visualize_metric_result", visualize_metric_result)
+          tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
+
+        writer.flush()
+
         print("=" * 100, flush=True)
 
         if train_acc_metric.result().numpy() > stop_acc and step_i > 0:
@@ -227,7 +248,7 @@ def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, all_hidden, decoder, model, all_hidden_model, discriminator = create_models(
-    FLAGS.encoded_size, FLAGS.num_timesteps, False)
+    FLAGS.encoded_size, FLAGS.num_timesteps, FLAGS.use_residual)
 
   optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate)
   # TODO: Lower learning rate as non train accuracy improves. Might help not mess up the hidden representations that it learned.
@@ -235,9 +256,9 @@ def main(_):
 
   train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
-  print("Regular training")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
-    decoder, train_indexies, [], True, .99)
+  print("Full model training")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+    decoder, train_indexies, [], True, .99, "train_full_model")
 
   adver_decoder = tf.keras.Sequential(
       [
@@ -249,12 +270,12 @@ def main(_):
   )
 
   print("Training Only Decoder")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
-    adver_decoder, train_indexies, [], False, .96)
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+    adver_decoder, train_indexies, [], False, .96, "train_decoder")
 
   print("Training Only Decoder Adversarial")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
-    adver_decoder, train_indexies, non_train_indexies, False, .98)
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+    adver_decoder, train_indexies, non_train_indexies, False, .98, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
   print("got model_results", flush=True)
@@ -265,6 +286,11 @@ def main(_):
 
   metric_result = combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
   print("metric_result", metric_result, flush=True)
+
+  writer = tf.summary.create_file_writer(FLAGS.job_dir)
+  with writer.as_default():
+    tf.summary.scalar("final_metric_result", metric_result, step=0)
+  writer.flush()
 
 
 if __name__ == '__main__':

@@ -24,7 +24,7 @@ def single_gt_index_metric(gt, gen_boards, thresh, non_train_indexies):
   return result
 
 
-def metric(eval_datas, gen_boards, thresh, non_train_indexies):
+def visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies):
   """Averages the metric on each of the ground truth states."""
   total_metric = 0
   for i in non_train_indexies:
@@ -33,6 +33,6 @@ def metric(eval_datas, gen_boards, thresh, non_train_indexies):
 
 
 def combine_metric(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
-  adver_metric = metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
-  regular_metric = metric(eval_datas, gen_boards, thresh, non_train_indexies)
+  adver_metric = visualize_metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
+  regular_metric = visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
   return max(adver_metric, regular_metric)

@@ -1,6 +1,6 @@
 import unittest
 
-import metrics
+import visualize_metric
 import train
 from matplotlib import pyplot as plt
 import numpy as np
@@ -17,7 +17,7 @@ class MetricTestCase(unittest.TestCase):
         self.metric_test_eval_datas = train.gen_data_batch(2000, 4)
 
     def metric_asserts(self, eval_datas, gen_boards, thresh, expected_min, expected_max):
-        metric_val = metrics.metric(eval_datas, gen_boards, thresh, non_train_indexies)
+        metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
 
         self.assertGreaterEqual(metric_val, expected_min)
         self.assertLessEqual(metric_val, expected_max)
@@ -30,8 +30,8 @@ class MetricTestCase(unittest.TestCase):
 
     def test_threshold_works(self):
         self.assertLess(
-            metrics.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .99, non_train_indexies),
-            metrics.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .4, non_train_indexies))
+            visualize_metric.visualize_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .99, non_train_indexies),
+            visualize_metric.visualize_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .4, non_train_indexies))
 
     def test_only_gets_partial_credit_if_repeating_same_state(self):
         metric_test_gen_datas = np.stack(
@@ -51,7 +51,7 @@ class MetricTestCase(unittest.TestCase):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
-        combine_val = metrics.combine_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, metric_test_gen_datas, .95, non_train_indexies)
+        combine_val = visualize_metric.combine_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, metric_test_gen_datas, .95, non_train_indexies)
         print(combine_val)
         self.assertGreaterEqual(combine_val, 1)
         self.assertLessEqual(combine_val, 1.1)
