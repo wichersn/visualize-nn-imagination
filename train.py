@@ -3,6 +3,7 @@ from scipy.signal import convolve2d
 import tensorflow as tf
 from absl import app
 from absl import flags
+import os
 
 from visualize_metric import combine_metric
 import visualize_metric
@@ -278,11 +279,8 @@ def main(_):
     adver_decoder, train_indexies, non_train_indexies, False, .98, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
-  print("got model_results", flush=True)
   gen_boards = get_gen_boards(decoder, model_results)
-  print("got gen_boards", flush=True)
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
-  print("got adver_gen_boards", flush=True)
 
   metric_result = combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
   print("metric_result", metric_result, flush=True)
@@ -292,6 +290,12 @@ def main(_):
     tf.summary.scalar("final_metric_result", metric_result, step=0)
   writer.flush()
 
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
+    np.save(file, eval_datas)
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "gen_boards"), 'wb') as file:
+    np.save(file, gen_boards)
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "adver_gen_boards"), 'wb') as file:
+    np.save(file, adver_gen_boards)
 
 if __name__ == '__main__':
   app.run(main)
