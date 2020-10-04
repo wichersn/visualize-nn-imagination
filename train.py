@@ -1,15 +1,22 @@
 import numpy as np
-import sys
 from scipy.signal import convolve2d
 import tensorflow as tf
 from absl import app
 from absl import flags
-from absl import logging
+
+from metrics import combine_metric
 
 FLAGS = flags.FLAGS
+flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
 flags.DEFINE_integer('eval_interval', 500, '')
 flags.DEFINE_integer('max_train_steps', 20000, '')
+
+flags.DEFINE_integer('num_timesteps', 3, '')
+flags.DEFINE_integer('encoded_size', 32, '')
+flags.DEFINE_integer('batch_size', 128, '')
+flags.DEFINE_float('learning_rate', .001, '')
+
 
 #Training data functions
 def life_step(X):
@@ -168,8 +175,8 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       metric.reset_states()
 
     for step_i in range(FLAGS.max_train_steps):
-      batch = get_batch(datas, 128)
-      adver_batch = get_batch(datas, 128)
+      batch = get_batch(datas, FLAGS.batch_size)
+      adver_batch = get_batch(datas, FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch), decoder, indexes_to_train, indexes_to_adver, train_model)
       if step_i % FLAGS.eval_interval == 0:
@@ -199,38 +206,6 @@ def get_gen_boards(decoder, model_results):
   gen_boards = np.transpose(gen_boards, (1,0,2,3,4))
   return gen_boards
 
-def single_index_metric(gt, gen, thresh):
-  """Returns the porportion of gen instances close enough to the ground truth."""
-  equal = np.equal(gt, gen>.5)
-  acc = np.mean(equal, (1,2,3))
-  over_thresh = acc >= thresh
-  return np.mean(over_thresh)
-
-def single_gt_index_metric(gt, gen_boards, thresh, non_train_indexies):
-  """Metric representing how well the gen boards represent the single ground truth state.
-  
-  It gets full credit the time it predicts the state the best, and partial credit for all other times.
-  """
-  metrics_for_gt = []
-  for j in non_train_indexies:
-    metrics_for_gt.append(single_index_metric(gt, gen_boards[:, j], thresh))
-  metrics_for_gt.sort(reverse = True)
-  weights = np.ones([len(non_train_indexies)]) * .5
-  weights[0] = 1
-  result = sum(np.multiply(metrics_for_gt, weights))
-  return result
-
-def metric(eval_datas, gen_boards, thresh, non_train_indexies):
-  """Averages the metric on each of the ground truth states."""
-  total_metric = 0
-  for i in non_train_indexies:
-    total_metric += single_gt_index_metric(eval_datas[:, i], gen_boards, thresh, non_train_indexies)
-  return total_metric / float(len(non_train_indexies))
-
-def combine_metric(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
-  adver_metric = metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
-  regular_metric = metric(eval_datas, gen_boards, thresh, non_train_indexies)
-  return max(adver_metric, regular_metric)
 
 train_acc_metric = tf.keras.metrics.BinaryAccuracy()
 non_train_acc_metric = tf.keras.metrics.BinaryAccuracy()
@@ -249,37 +224,47 @@ loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0
 leak_relu = tf.keras.layers.LeakyReLU
 
 def main(_):
-  T = 3
-  encoded_size = 32
-  datas = gen_data_batch(100000, T)
-  eval_datas = gen_data_batch(10000, T)
-  encoder, intermediates, all_hidden, decoder, model, all_hidden_model, discriminator = create_models(encoded_size, T, False)
+  datas = gen_data_batch(100000, FLAGS.num_timesteps)
+  eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
+  encoder, intermediates, all_hidden, decoder, model, all_hidden_model, discriminator = create_models(
+    FLAGS.encoded_size, FLAGS.num_timesteps, False)
 
-  optimizer=tf.keras.optimizers.Adam(.001) # .001 lr works better than smaller ones.
+  optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate)
   # TODO: Lower learning rate as non train accuracy improves. Might help not mess up the hidden representations that it learned.
   discriminator_opt=tf.keras.optimizers.Adam()
 
-  train_indexies = [0,T]
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, reg_amount=0)(decoder, train_indexies, [], True, .99)
+  train_indexies = [0,FLAGS.num_timesteps]
+  non_train_indexies = range(1, FLAGS.num_timesteps)
+  print("Regular training")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
+    decoder, train_indexies, [], True, .99)
 
   adver_decoder = tf.keras.Sequential(
       [
         tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same'),
+        tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
+        tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same'),
         tf.keras.layers.Conv2D(1, 3, activation=None, padding='same'),
       ], name="adver_decoder",
   )
 
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, reg_amount=0)(adver_decoder, train_indexies, [], False, .99)
-  print("Training adversarally")
-  non_train_indexies = range(1, T)
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, reg_amount=0)(adver_decoder, train_indexies, non_train_indexies, False, .99)
+  print("Training Only Decoder")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
+    adver_decoder, train_indexies, [], False, .96)
+
+  print("Training Only Decoder Adversarial")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=0)(
+    adver_decoder, train_indexies, non_train_indexies, False, .98)
 
   model_results = model(eval_datas[:, 0])
+  print("got model_results", flush=True)
   gen_boards = get_gen_boards(decoder, model_results)
+  print("got gen_boards", flush=True)
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
+  print("got adver_gen_boards", flush=True)
 
-  combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
+  metric_result = combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
+  print("metric_result", metric_result, flush=True)
 
 
 if __name__ == '__main__':

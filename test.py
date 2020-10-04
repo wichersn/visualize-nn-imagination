@@ -1,4 +1,6 @@
 import unittest
+
+import metrics
 import train
 from matplotlib import pyplot as plt
 import numpy as np
@@ -9,13 +11,13 @@ FLAGS = flags.FLAGS
 
 non_train_indexies = [1,2,3]
 
-class TestCase(unittest.TestCase):
+class MetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
         self.metric_test_eval_datas = train.gen_data_batch(2000, 4)
 
     def metric_asserts(self, eval_datas, gen_boards, thresh, expected_min, expected_max):
-        metric_val = train.metric(eval_datas, gen_boards, thresh, non_train_indexies)
+        metric_val = metrics.metric(eval_datas, gen_boards, thresh, non_train_indexies)
 
         self.assertGreaterEqual(metric_val, expected_min)
         self.assertLessEqual(metric_val, expected_max)
@@ -27,8 +29,9 @@ class TestCase(unittest.TestCase):
         self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .99, 1, 1.1)
 
     def test_threshold_works(self):
-        self.assertLess(train.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .99, non_train_indexies),
-                        train.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .4, non_train_indexies))
+        self.assertLess(
+            metrics.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .99, non_train_indexies),
+            metrics.metric(self.metric_test_eval_datas, self.metric_test_eval_datas, .4, non_train_indexies))
 
     def test_only_gets_partial_credit_if_repeating_same_state(self):
         metric_test_gen_datas = np.stack(
@@ -48,7 +51,7 @@ class TestCase(unittest.TestCase):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
-        combine_val = train.combine_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, metric_test_gen_datas, .95, non_train_indexies)
+        combine_val = metrics.combine_metric(self.metric_test_eval_datas, self.metric_test_eval_datas, metric_test_gen_datas, .95, non_train_indexies)
         print(combine_val)
         self.assertGreaterEqual(combine_val, 1)
         self.assertLessEqual(combine_val, 1.1)
