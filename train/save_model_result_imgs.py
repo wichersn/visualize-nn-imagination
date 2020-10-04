@@ -17,10 +17,9 @@ def save_imgs(input_array_name):
 
     data = np.load(io.gfile.GFile(input_array_path, 'rb'))
     print("data.shape", data.shape)
-    # im = Image.fromarray(data[0,0,:,:,0])
 
+    # TODO: Should save all of the images
     imsave(input_array_path+".png", data[0,0,:,:,0])
-    # im.save(io.gfile.GFile(input_array_path+".png"))
 
 def main(_):
     save_imgs("eval_datas")

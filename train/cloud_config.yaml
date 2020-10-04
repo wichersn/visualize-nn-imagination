@@ -1,0 +1,38 @@
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: n1-standard-8
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: final_metric_result
+    maxTrials: 40
+    maxParallelTrials: 1
+    params:
+      - parameterName: gin_bindings=DoomEnvironment.frame_skip
+        type: INTEGER
+        minValue: 2
+        maxValue: 6
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: gin_bindings=critic/tf.train.AdamOptimizer.learning_rate
+        type: DOUBLE
+        minValue: 0.00001
+        maxValue: 0.01
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: gin_bindings=ppo_kl_penalty_agent.PPOKLPenaltyAgent.adaptive_kl_target
+        type: DOUBLE
+        minValue: 0.001
+        maxValue: 0.1
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: gin_bindings=ppo_kl_penalty_agent.PPOKLPenaltyAgent.num_epochs
+        type: INTEGER
+        minValue: 15
+        maxValue: 40
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: gin_bindings=CONV_LAYER_PARAMS
+        type: CATEGORICAL
+        categoricalValues:
+        - "[[16, 3, 2]]"
+        - "[[16, 3, 2], [32, 3, 2]]"
