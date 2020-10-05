@@ -21,5 +21,6 @@ gcloud ai-platform jobs submit training $JOB_NAME \
   --python-version 3.7 \
   --runtime-version 2.2 \
   --job-dir $JOB_DIR \
+  --config cloud_config.yaml \
 
 echo "python3 -m tensorboard.main --logdir $JOB_DIR"

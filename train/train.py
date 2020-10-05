@@ -4,6 +4,7 @@ import tensorflow as tf
 from absl import app
 from absl import flags
 import os
+import hypertune
 
 import train.visualize_metric
 
@@ -23,7 +24,7 @@ flags.DEFINE_integer('encoded_size', 32, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', .0001, '')
-flags.DEFINE_integer('use_residual', 0, '')
+flags.DEFINE_integer('use_residual', 1, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
@@ -75,7 +76,6 @@ def create_models(encoded_size, T, use_residual):
       ], name="encoder",
   )
   intermediates = [encoder(input_layer)]
-  all_hidden = []
 
   timestep_model = tf.keras.Sequential(
       [
@@ -84,15 +84,11 @@ def create_models(encoded_size, T, use_residual):
         tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
       ], name="timestep_model",
   )
-  timestep_model_all_hidden_out = [layer.output for layer in timestep_model.layers]
-  timestep_model_all_hidden_out[-1] += timestep_model.layers[0].input
-  timestep_model_all_hidden = tf.keras.Model(timestep_model.inputs, timestep_model_all_hidden_out)
   for i in range(T):
-    timestep_all_hidden = timestep_model_all_hidden(intermediates[-1])
+    timestep = timestep_model(intermediates[-1])
     if use_residual:
-      timestep_all_hidden[-1] += intermediates[-1]
-    intermediates.append(timestep_all_hidden[-1])
-    all_hidden.append(timestep_all_hidden)
+      timestep += intermediates[-1]
+    intermediates.append(timestep)
 
   decoder = tf.keras.Sequential(
       [
@@ -102,7 +98,6 @@ def create_models(encoded_size, T, use_residual):
   )
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
-  all_hidden_model = tf.keras.Model(inputs=input_layer, outputs=all_hidden)
 
   discriminator = tf.keras.Sequential(
       [
@@ -120,7 +115,7 @@ def create_models(encoded_size, T, use_residual):
       ], name="discriminator",
   )
 
-  return encoder, intermediates, all_hidden, decoder, model, all_hidden_model, discriminator
+  return encoder, intermediates, decoder, model, discriminator
 
 def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
     real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
@@ -253,7 +248,7 @@ leak_relu = tf.keras.layers.LeakyReLU
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
-  encoder, intermediates, all_hidden, decoder, model, all_hidden_model, discriminator = create_models(
+  encoder, intermediates, decoder, model, discriminator = create_models(
     FLAGS.encoded_size, FLAGS.num_timesteps, FLAGS.use_residual)
 
   optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate)
@@ -294,6 +289,11 @@ def main(_):
   with writer.as_default():
     tf.summary.scalar("final_metric_result", metric_result, step=0)
   writer.flush()
+  hpt = hypertune.HyperTune()
+  hpt.report_hyperparameter_tuning_metric(
+    hyperparameter_metric_tag="final_metric_result",
+    metric_value=metric_result,
+    global_step=0)
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
     np.save(file, eval_datas)
