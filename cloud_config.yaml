@@ -8,7 +8,7 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
-    maxTrials: 6
+    maxTrials: 40
     maxParallelTrials: 5
     params:
       - parameterName: num_timesteps

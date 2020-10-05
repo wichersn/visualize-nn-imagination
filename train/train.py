@@ -4,20 +4,14 @@ import tensorflow as tf
 from absl import app
 from absl import flags
 import os
-import hypertune
 
 import train.visualize_metric
 
 FLAGS = flags.FLAGS
-# flags.DEFINE_integer('eval_data_size', 10000, '')
-# flags.DEFINE_multi_integer('board_size', [20,20], '')
-# flags.DEFINE_integer('eval_interval', 500, '')
-# flags.DEFINE_integer('max_train_steps', 20000, '')
-
-flags.DEFINE_integer('eval_data_size', 100, '')
+flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
-flags.DEFINE_integer('eval_interval', 2, '')
-flags.DEFINE_integer('max_train_steps', 4, '')
+flags.DEFINE_integer('eval_interval', 500, '')
+flags.DEFINE_integer('max_train_steps', 30000, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 32, '')
@@ -289,11 +283,6 @@ def main(_):
   with writer.as_default():
     tf.summary.scalar("final_metric_result", metric_result, step=0)
   writer.flush()
-  hpt = hypertune.HyperTune()
-  hpt.report_hyperparameter_tuning_metric(
-    hyperparameter_metric_tag="final_metric_result",
-    metric_value=metric_result,
-    global_step=0)
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
     np.save(file, eval_datas)
