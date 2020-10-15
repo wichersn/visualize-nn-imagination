@@ -20,3 +20,4 @@ This will add the images to a `img` directory in `gs://visualize-nn-imagination-
 Download them with 
 
     gsutil cp -r gs://visualize-nn-imagination-runs/full_hp_gpu_603721/imgs/ some_local_dir
+    

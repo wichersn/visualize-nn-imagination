@@ -10,15 +10,19 @@ import train.visualize_metric
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
-flags.DEFINE_integer('eval_interval', 500, '')
+flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 30000, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 32, '')
+flags.DEFINE_integer('encoder_layers', 2, '')
+flags.DEFINE_integer('timestep_layers', 3, '')
+flags.DEFINE_integer('decoder_layers', 2, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', .0001, '')
 flags.DEFINE_integer('use_residual', 1, '')
+
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
@@ -63,33 +67,30 @@ def create_models(encoded_size, T, use_residual):
   input_shape = FLAGS.board_size + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)
 
-  encoder = tf.keras.Sequential(
-      [
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-      ], name="encoder",
-  )
+  encoder = tf.keras.Sequential(name="encoder")
+  for _ in range(FLAGS.encoder_layers):
+    encoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
+  print("encoder", encoder.layers)
+
   intermediates = [encoder(input_layer)]
 
-  timestep_model = tf.keras.Sequential(
-      [
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1), input_shape=FLAGS.board_size+[encoded_size,]),
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-      ], name="timestep_model",
-  )
+  timestep_model = tf.keras.Sequential(name="timestep_model")
+  for _ in range(FLAGS.timestep_layers):
+   timestep_model.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same',
+                         kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("timestep_model", timestep_model.layers)
+
   for i in range(T):
     timestep = timestep_model(intermediates[-1])
     if use_residual:
       timestep += intermediates[-1]
     intermediates.append(timestep)
 
-  decoder = tf.keras.Sequential(
-      [
-        tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-        tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),
-      ], name="decoder",
-  )
+  decoder = tf.keras.Sequential(name="decoder")
+  for _ in range(FLAGS.decoder_layers-1):
+    decoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("decoder", decoder.layers)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
 
@@ -173,7 +174,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
     
   def train_model(decoder, indexes_to_train, indexes_to_adver, train_model, stop_acc, metric_prefix):
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
-    eval_datas = gen_data_batch(int(FLAGS.eval_data_size/10)+1, FLAGS.num_timesteps)
+    eval_datas = gen_data_batch(int(FLAGS.eval_data_size/50)+1, FLAGS.num_timesteps)
     non_train_indexies = range(1, FLAGS.num_timesteps)
 
     for name, metric in metrics:
@@ -201,10 +202,12 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         print("=" * 100, flush=True)
 
         if train_acc_metric.result().numpy() > stop_acc and step_i > 0:
-            break
+          return True
 
         for name, metric in metrics:
           metric.reset_states()
+
+    return False
 
   return train_model
 
@@ -239,6 +242,13 @@ metrics = [
 loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
 leak_relu = tf.keras.layers.LeakyReLU
 
+def save_metric_result(metric_result):
+  writer = tf.summary.create_file_writer(FLAGS.job_dir)
+  print("final_metric_result", metric_result)
+  with writer.as_default():
+    tf.summary.scalar("final_metric_result", metric_result, step=0)
+  writer.flush()
+
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
@@ -252,8 +262,12 @@ def main(_):
   train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
   print("Full model training")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  converged = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
     decoder, train_indexies, [], True, .99, "train_full_model")
+
+  if not converged:
+    save_metric_result(-1.0)
+    return
 
   adver_decoder = tf.keras.Sequential(
       [
@@ -279,10 +293,7 @@ def main(_):
   metric_result = train.visualize_metric.combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
   print("metric_result", metric_result, flush=True)
 
-  writer = tf.summary.create_file_writer(FLAGS.job_dir)
-  with writer.as_default():
-    tf.summary.scalar("final_metric_result", metric_result, step=0)
-  writer.flush()
+  save_metric_result(metric_result)
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
     np.save(file, eval_datas)

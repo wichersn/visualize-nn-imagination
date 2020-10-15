@@ -17,17 +17,35 @@ trainingInput:
         maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: encoder_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 4
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: timestep_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 4
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 4
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: encoded_size
         type: INTEGER
         minValue: 4
         maxValue: 64
-        scaleType: UNIT_LOG_SCALE
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
         minValue: 64
         maxValue: 256
-        scaleType: UNIT_LOG_SCALE
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
