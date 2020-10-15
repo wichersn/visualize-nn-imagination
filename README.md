@@ -2,6 +2,8 @@
     chmod +x launch_cloud.sh
     ./launch_cloud.sh job_name
     
+You might have to change the `--region` flag in `launch_cloud` to get it to schedule. Sometimes jobs stay `Queued` for 10 hours. See [here](https://cloud.google.com/compute/docs/gpus) for regions with p100s or whatever gpu type is in `cloud_config.yaml`
+    
 # Train local
      python3 -m train.train --job_dir something
      
