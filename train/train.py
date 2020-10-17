@@ -202,12 +202,12 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         print("=" * 100, flush=True)
 
         if train_acc_metric.result().numpy() > stop_acc and step_i > 0:
-          return True
+          return train_acc_metric.result().numpy()
 
         for name, metric in metrics:
           metric.reset_states()
 
-    return False
+    return train_acc_metric.result().numpy()
 
   return train_model
 
@@ -262,11 +262,11 @@ def main(_):
   train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
   print("Full model training")
-  converged = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
     decoder, train_indexies, [], True, .99, "train_full_model")
 
-  if not converged:
-    save_metric_result(-1.0)
+  if train_acc < .99:
+    save_metric_result(train_acc - 1)
     return
 
   adver_decoder = tf.keras.Sequential(
