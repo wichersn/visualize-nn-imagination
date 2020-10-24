@@ -20,7 +20,7 @@ flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
-flags.DEFINE_float('reg_amount', .0001, '')
+flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_integer('use_residual', 1, '')
 
 
@@ -272,11 +272,12 @@ def main(_):
   adver_decoder = tf.keras.Sequential(
       [
         tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-        tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-        tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same'),
-        tf.keras.layers.Conv2D(1, 3, activation=None, padding='same'),
-      ], name="adver_decoder",
+      ], name="adver_decoder"
   )
+  for _ in range(FLAGS.decoder_layers-1):
+    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  adver_decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("adver_decoder", adver_decoder.layers)
 
   print("Training Only Decoder")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(

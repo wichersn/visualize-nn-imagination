@@ -26,7 +26,7 @@ trainingInput:
       - parameterName: timestep_layers
         type: INTEGER
         minValue: 2
-        maxValue: 4
+        maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
@@ -37,7 +37,7 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 4
+        minValue: 8
         maxValue: 64
         scaleType: UNIT_LINEAR_SCALE
 
@@ -53,11 +53,11 @@ trainingInput:
         maxValue: .01
         scaleType: UNIT_LOG_SCALE
 
-      - parameterName: reg_amount
-        type: DOUBLE
-        minValue: .0000001
-        maxValue: .001
-        scaleType: UNIT_LOG_SCALE
+#      - parameterName: reg_amount
+#        type: DOUBLE
+#        minValue: .0000001
+#        maxValue: .001
+#        scaleType: UNIT_LOG_SCALE
 
       - parameterName: use_residual
         type: INTEGER
