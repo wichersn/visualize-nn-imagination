@@ -4,6 +4,7 @@ from absl import flags
 from skimage.io import imsave
 import os
 from tensorflow import io
+import tensorflow as tf
 from absl import app
 
 FLAGS = flags.FLAGS
@@ -40,8 +41,12 @@ def main(_):
 
     if FLAGS.is_hp_serach_root:
         for i in range(1, 99999):
-            save_imgs(os.path.join(FLAGS.job_dir, str(i)), os.path.join(FLAGS.job_dir, "imgs", str(i)),
-                      input_array_names, 20)
+            try:
+                save_imgs(os.path.join(FLAGS.job_dir, str(i)), os.path.join(FLAGS.job_dir, "imgs", str(i)),
+                          input_array_names, 20)
+            except tf.python.framework.errors_impl.NotFoundError:
+                print("No eval for", i)
+                pass
     else:
         save_imgs(FLAGS.job_dir, os.path.join(FLAGS.job_dir, "imgs"), input_array_names, 20)
 

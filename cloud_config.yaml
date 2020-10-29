@@ -9,58 +9,58 @@ trainingInput:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
     maxTrials: 20
-    maxParallelTrials: 1
+    maxParallelTrials: 5
     params:
       - parameterName: num_timesteps
         type: INTEGER
         minValue: 3
-        maxValue: 6
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 1
-        maxValue: 4
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 2
-        maxValue: 5
+        minValue: 4
+        maxValue: 8
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
         type: INTEGER
         minValue: 1
-        maxValue: 4
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 8
-        maxValue: 64
+        minValue: 2
+        maxValue: 40
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 64
-        maxValue: 256
+        minValue: 200
+        maxValue: 512
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: .0001
-        maxValue: .01
+        minValue: .00001
+        maxValue: .0001
         scaleType: UNIT_LOG_SCALE
 
-#      - parameterName: reg_amount
-#        type: DOUBLE
-#        minValue: .0000001
-#        maxValue: .001
-#        scaleType: UNIT_LOG_SCALE
+      - parameterName: reg_amount
+        type: DOUBLE
+        minValue: .00000001
+        maxValue: .001
+        scaleType: UNIT_LOG_SCALE
 
       - parameterName: use_residual
         type: INTEGER
-        minValue: 0
+        minValue: 1
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
