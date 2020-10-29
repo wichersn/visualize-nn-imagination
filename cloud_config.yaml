@@ -50,7 +50,7 @@ trainingInput:
       - parameterName: learning_rate
         type: DOUBLE
         minValue: .00001
-        maxValue: .0001
+        maxValue: .001
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount

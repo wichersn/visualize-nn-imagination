@@ -11,7 +11,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
 flags.DEFINE_integer('eval_interval', 1000, '')
-flags.DEFINE_integer('max_train_steps', 30000, '')
+flags.DEFINE_integer('max_train_steps', 80000, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 32, '')
@@ -261,11 +261,12 @@ def main(_):
 
   train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
+  target_train_accuracy = .99
   print("Full model training")
   train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    decoder, train_indexies, [], True, .99, "train_full_model")
+    decoder, train_indexies, [], True, target_train_accuracy, "train_full_model")
 
-  if train_acc < .99:
+  if train_acc < target_train_accuracy:
     save_metric_result(train_acc - 1)
     return
 
