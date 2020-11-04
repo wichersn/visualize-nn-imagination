@@ -10,16 +10,16 @@ import train.visualize_metric
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
-flags.DEFINE_integer('eval_interval', 1000, '')
+flags.DEFINE_integer('eval_interval', 100, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 
-flags.DEFINE_integer('num_timesteps', 3, '')
-flags.DEFINE_integer('encoded_size', 32, '')
-flags.DEFINE_integer('encoder_layers', 2, '')
+flags.DEFINE_integer('num_timesteps', 2, '')
+flags.DEFINE_integer('encoded_size', 16, '')
+flags.DEFINE_integer('encoder_layers', 1, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
-flags.DEFINE_integer('decoder_layers', 2, '')
+flags.DEFINE_integer('decoder_layers', 1, '')
 flags.DEFINE_integer('batch_size', 128, '')
-flags.DEFINE_float('learning_rate', .001, '')
+flags.DEFINE_float('learning_rate', .01, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_integer('use_residual', 1, '')
 
@@ -144,9 +144,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         pred = decoder(model_outputs[i])
         if i in indexes_to_train:
           loss += loss_fn(outputs_batch[:, i], pred)
-          train_acc_metric.update_state(outputs_batch[:, i], pred)
-        else:
-          non_train_acc_metric.update_state(outputs_batch[:, i], pred)
+        acc_metrics[i].update_state(outputs_batch[:, i], pred)
 
         if i in indexes_to_adver:
           discrim_on_pred = discriminator(tf.math.sigmoid(pred))
@@ -164,8 +162,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       trainable_weights += model.trainable_weights
     grads = tape.gradient(loss, trainable_weights)
     clip_val = .1
-    grads = [(tf.clip_by_value(grad, -clip_val, clip_val))
-                                      for grad in grads]
+    grads = [(tf.clip_by_value(grad, -clip_val, clip_val)) for grad in grads]
     optimizer.apply_gradients(zip(grads, trainable_weights))
 
     if ran_discrim:
@@ -176,6 +173,9 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
     eval_datas = gen_data_batch(int(FLAGS.eval_data_size/50)+1, FLAGS.num_timesteps)
     non_train_indexies = range(1, FLAGS.num_timesteps)
+
+    print("last train index", indexes_to_train[-1])
+    last_train_metric = acc_metrics[indexes_to_train[-1]]
 
     for name, metric in metrics:
       metric.reset_states()
@@ -191,23 +191,23 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
             print(step_i, name, metric.result().numpy())
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
-          model_results = model(eval_datas[:, 0])
-          gen_boards = get_gen_boards(decoder, model_results)
-          visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
-          print("visualize_metric_result", visualize_metric_result)
-          tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
+          # model_results = model(eval_datas[:, 0])
+          # gen_boards = get_gen_boards(decoder, model_results)
+          # visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
+          # print("visualize_metric_result", visualize_metric_result)
+          # tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
 
         writer.flush()
 
         print("=" * 100, flush=True)
 
-        if train_acc_metric.result().numpy() > stop_acc and step_i > 0:
-          return train_acc_metric.result().numpy()
+        if last_train_metric.result().numpy() > stop_acc and step_i > 0:
+          return last_train_metric.result().numpy()
 
         for name, metric in metrics:
           metric.reset_states()
 
-    return train_acc_metric.result().numpy()
+    return last_train_metric.result().numpy()
 
   return train_model
 
@@ -226,18 +226,16 @@ def get_gen_boards(decoder, model_results):
   return gen_boards
 
 
-train_acc_metric = tf.keras.metrics.BinaryAccuracy()
-non_train_acc_metric = tf.keras.metrics.BinaryAccuracy()
+
 discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
 gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
 reg_loss_metric = tf.keras.metrics.Mean()
 metrics = [
-    ["train_acc", train_acc_metric],
-    ["non_train_acc", non_train_acc_metric],
     ["discrim_acc", discrim_acc_metric],
     ["gen_acc", gen_acc_metric],
     ["reg loss", reg_loss_metric],
 ]
+acc_metrics = None
 
 loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
 leak_relu = tf.keras.layers.LeakyReLU
@@ -250,6 +248,11 @@ def save_metric_result(metric_result):
   writer.flush()
 
 def main(_):
+  global acc_metrics, metrics
+  acc_metrics = [tf.keras.metrics.BinaryAccuracy() for _ in range(FLAGS.num_timesteps+1)]
+  for i in range(FLAGS.num_timesteps+1):
+    metrics.append(["acc at {}".format(i), acc_metrics[i]])
+
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, decoder, model, discriminator = create_models(
@@ -282,11 +285,11 @@ def main(_):
 
   print("Training Only Decoder")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, [], False, .96, "train_decoder")
+    adver_decoder, train_indexies, [], False, .95, "train_decoder")
 
   print("Training Only Decoder Adversarial")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, non_train_indexies, False, .98, "train_decoder_adversarial")
+    adver_decoder, train_indexies, non_train_indexies, False, .97, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
