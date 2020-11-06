@@ -34,6 +34,9 @@ def life_step(X):
     nbrs_count = convolve2d(X, np.ones((3, 3)), mode='same', boundary='fill') - X
     return (nbrs_count == 3) | (X & (nbrs_count == 2))
 
+def num_black_cells(X):
+    return np.sum(X, axis=(1, 2))
+    
 def convert_model_in(data):
   data = np.array(data)
   data = data.astype(np.float32)
@@ -92,6 +95,13 @@ def create_models(encoded_size, T, use_residual):
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("decoder", decoder.layers)
 
+  decoder_counter = tf.keras.Sequential(name="decoder-counter")
+  for _ in range(FLAGS.decoder_layers-1):
+    decoder_counter.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  decoder_counter.add(tf.keras.layers.Flatten())
+  decoder_counter.add(tf.keras.layers.Dense(1))
+  print("decoder_counter", decoder_counter.layers)
+
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
 
   discriminator = tf.keras.Sequential(
@@ -110,7 +120,7 @@ def create_models(encoded_size, T, use_residual):
       ], name="discriminator",
   )
 
-  return encoder, intermediates, decoder, model, discriminator
+  return encoder, intermediates, decoder, decoder_counter, model, discriminator
 
 def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
     real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
@@ -120,14 +130,15 @@ def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
     discrim_acc_metric.update_state(tf.zeros_like(discrim_on_gen), discrim_on_gen)
     total_loss = real_loss + fake_loss
     return total_loss
-
+    
 def get_batch(datas, batch_size):
     idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    return datas[idx]
+    targets = num_black_cells(datas[:, 0])
+    return datas[idx], targets[idx]
 
 def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, reg_amount=0):
   @tf.function
-  def train_step(batch, adver_batch, decoder, indexes_to_train, indexes_to_adver, train_model):
+  def train_step(batch, batch_targets, adver_batch, decoder, decoder_counter, indexes_to_train, indexes_to_adver, train_model, metric_prefix):
     inputs_batch = batch[:, 0]
     outputs_batch = batch
     with tf.GradientTape() as tape, tf.GradientTape() as disc_tape:
@@ -139,6 +150,11 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       reg_loss = sum(model.losses) + sum(decoder.losses)
       reg_loss_metric.update_state([reg_loss])
       loss = reg_loss * reg_amount
+      
+      if metric_prefix == "count_cells":
+        pred = decoder_counter(model_outputs[-1])
+        loss += mse_loss(batch_targets, pred)
+        train_mse_metric.update_state(batch_targets, pred)
 
       for i in range(T+1):
         pred = decoder(model_outputs[i])
@@ -158,8 +174,11 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
           ran_discrim = True
 
       loss /= len(indexes_to_train)
-
-    trainable_weights =  decoder.trainable_weights
+    trainable_weights = None
+    if metric_prefix == "count_cells":
+      trainable_weights = decoder_counter.trainable_weights
+    else:
+      trainable_weights = decoder.trainable_weights
     if train_model:
       trainable_weights += model.trainable_weights
     grads = tape.gradient(loss, trainable_weights)
@@ -172,7 +191,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       disctim_grads = disc_tape.gradient(discriminator_loss, discriminator.trainable_weights)
       discriminator_opt.apply_gradients(zip(disctim_grads, discriminator.trainable_weights))
     
-  def train_model(decoder, indexes_to_train, indexes_to_adver, train_model, stop_acc, metric_prefix):
+  def train_model(decoder, decoder_counter, indexes_to_train, indexes_to_adver, train_model, stop_acc, stop_mse, metric_prefix):
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
     eval_datas = gen_data_batch(int(FLAGS.eval_data_size/50)+1, FLAGS.num_timesteps)
     non_train_indexies = range(1, FLAGS.num_timesteps)
@@ -181,10 +200,10 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       metric.reset_states()
 
     for step_i in range(FLAGS.max_train_steps):
-      batch = get_batch(datas, FLAGS.batch_size)
-      adver_batch = get_batch(datas, FLAGS.batch_size)
+      batch, targets = get_batch(datas, FLAGS.batch_size)
+      adver_batch, adver_targets = get_batch(datas, FLAGS.batch_size)
 
-      train_step(tf.constant(batch), tf.constant(adver_batch), decoder, indexes_to_train, indexes_to_adver, train_model)
+      train_step(tf.constant(batch), tf.constant(targets), tf.constant(adver_batch), decoder, decoder_counter, indexes_to_train, indexes_to_adver, train_model, metric_prefix)
       if step_i % FLAGS.eval_interval == 0:
         with writer.as_default():
           for name, metric in metrics:
@@ -200,14 +219,17 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         writer.flush()
 
         print("=" * 100, flush=True)
-
-        if train_acc_metric.result().numpy() > stop_acc and step_i > 0:
+        if metric_prefix == "count_cells" and train_mse_metric.result().numpy() < stop_mse and step_i > 0:
+          return train_mse_metric.result().numpy()
+        if metric_prefix != "count_cells" and train_acc_metric.result().numpy() > stop_acc and step_i > 0:
           return train_acc_metric.result().numpy()
 
         for name, metric in metrics:
           metric.reset_states()
-
-    return train_acc_metric.result().numpy()
+    if metric_prefix == "count_cells":
+      return train_mse_metric.result().numpy()
+    else:
+      return train_acc_metric.result().numpy()
 
   return train_model
 
@@ -227,12 +249,14 @@ def get_gen_boards(decoder, model_results):
 
 
 train_acc_metric = tf.keras.metrics.BinaryAccuracy()
+train_mse_metric = tf.keras.metrics.MeanSquaredError()
 non_train_acc_metric = tf.keras.metrics.BinaryAccuracy()
 discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
 gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
 reg_loss_metric = tf.keras.metrics.Mean()
 metrics = [
     ["train_acc", train_acc_metric],
+    ["train_mse", train_mse_metric],
     ["non_train_acc", non_train_acc_metric],
     ["discrim_acc", discrim_acc_metric],
     ["gen_acc", gen_acc_metric],
@@ -240,6 +264,7 @@ metrics = [
 ]
 
 loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
+mse_loss = tf.keras.losses.MeanSquaredError()
 leak_relu = tf.keras.layers.LeakyReLU
 
 def save_metric_result(metric_result):
@@ -252,7 +277,7 @@ def save_metric_result(metric_result):
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
-  encoder, intermediates, decoder, model, discriminator = create_models(
+  encoder, intermediates, decoder, decoder_counter, model, discriminator = create_models(
     FLAGS.encoded_size, FLAGS.num_timesteps, FLAGS.use_residual)
 
   optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate)
@@ -262,9 +287,10 @@ def main(_):
   train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
   target_train_accuracy = .99
+  target_train_mse = 0.5
   print("Full model training")
   train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    decoder, train_indexies, [], True, target_train_accuracy, "train_full_model")
+    decoder, decoder_counter, train_indexies, [], True, target_train_accuracy, target_train_mse, "train_full_model")
 
   if train_acc < target_train_accuracy:
     save_metric_result(train_acc - 1)
@@ -282,11 +308,11 @@ def main(_):
 
   print("Training Only Decoder")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, [], False, .96, "train_decoder")
+    adver_decoder, decoder_counter, train_indexies, [], False, .96, target_train_mse, "train_decoder")
 
   print("Training Only Decoder Adversarial")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, non_train_indexies, False, .98, "train_decoder_adversarial")
+    adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, .98, target_train_mse, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
