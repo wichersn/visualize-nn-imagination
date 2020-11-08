@@ -39,11 +39,11 @@ def main(_):
   # TODO: Lower learning rate as non train accuracy improves. Might help not mess up the hidden representations that it learned.
   discriminator_opt=tf.keras.optimizers.Adam()
 
-  train_indexies = []
+  train_indexies = [0]
   non_train_indexies = range(0, FLAGS.num_timesteps)
   target_train_mse = 1
   print("Full model training")
-  train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  train_mse = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
     decoder, decoder_counter, train_indexies, [], True, .99, target_train_mse, "count_cells")
   #TESTING IF WE CAN COUNT CELLS
   save_metric_result(train_mse)

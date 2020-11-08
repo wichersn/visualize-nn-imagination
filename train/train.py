@@ -154,7 +154,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       if metric_prefix == "count_cells":
         pred = decoder_counter(model_outputs[-1])
         loss += mse_loss(batch_targets, pred)
-        train_mse_metric.update_state(batch_targets, pred)
+        train_mse_metric_count_cells.update_state(batch_targets, pred)
 
       for i in range(T+1):
         pred = decoder(model_outputs[i])
@@ -177,6 +177,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
     trainable_weights = None
     if metric_prefix == "count_cells":
       trainable_weights = decoder_counter.trainable_weights
+      trainable_weights += decoder.trainable_weights
     else:
       trainable_weights = decoder.trainable_weights
     if train_model:
@@ -219,15 +220,15 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         writer.flush()
 
         print("=" * 100, flush=True)
-        if metric_prefix == "count_cells" and train_mse_metric.result().numpy() < stop_mse and step_i > 0:
-          return train_mse_metric.result().numpy()
+        if metric_prefix == "count_cells" and train_mse_metric_count_cells.result().numpy() < stop_mse and step_i > 0:
+          return train_mse_metric_count_cells.result().numpy()
         if metric_prefix != "count_cells" and train_acc_metric.result().numpy() > stop_acc and step_i > 0:
           return train_acc_metric.result().numpy()
 
         for name, metric in metrics:
           metric.reset_states()
     if metric_prefix == "count_cells":
-      return train_mse_metric.result().numpy()
+      return train_mse_metric_count_cells.result().numpy()
     else:
       return train_acc_metric.result().numpy()
 
@@ -249,14 +250,14 @@ def get_gen_boards(decoder, model_results):
 
 
 train_acc_metric = tf.keras.metrics.BinaryAccuracy()
-train_mse_metric = tf.keras.metrics.MeanSquaredError()
+train_mse_metric_count_cells = tf.keras.metrics.MeanSquaredError()
 non_train_acc_metric = tf.keras.metrics.BinaryAccuracy()
 discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
 gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
 reg_loss_metric = tf.keras.metrics.Mean()
 metrics = [
     ["train_acc", train_acc_metric],
-    ["train_mse", train_mse_metric],
+    ["train_mse", train_mse_metric_count_cells],
     ["non_train_acc", non_train_acc_metric],
     ["discrim_acc", discrim_acc_metric],
     ["gen_acc", gen_acc_metric],
