@@ -13,8 +13,8 @@ trainingInput:
     params:
       - parameterName: num_timesteps
         type: INTEGER
-        minValue: 4
-        maxValue: 4
+        minValue: 2
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoder_layers
@@ -25,7 +25,7 @@ trainingInput:
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 3
+        minValue: 4
         maxValue: 8
         scaleType: UNIT_LINEAR_SCALE
 
@@ -37,7 +37,7 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 2
+        minValue: 4
         maxValue: 40
         scaleType: UNIT_LINEAR_SCALE
 
