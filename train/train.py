@@ -14,6 +14,8 @@ flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 
+flags.DEFINE_float('target_train_accuracy', .99, '')
+
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
@@ -137,7 +139,7 @@ def get_batch(datas, batch_size):
     targets = num_black_cells(datas[:, 0])
     return datas[idx], targets[idx]
 
-def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, reg_amount=0):
+def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, acc_metrics, reg_amount=0):
   @tf.function
   def train_step(batch, batch_targets, adver_batch, decoder, decoder_counter, indexes_to_train, indexes_to_adver, train_model, metric_prefix):
     inputs_batch = batch[:, 0]
@@ -197,6 +199,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
     non_train_indexies = range(1, FLAGS.num_timesteps)
 
     print("last train index", indexes_to_train[-1])
+    print("acc_metrics", acc_metrics)
     last_train_metric = acc_metrics[indexes_to_train[-1]]
 
     for name, metric in metrics:
@@ -302,33 +305,40 @@ def main(_):
   else:
     train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
-  target_train_accuracy = .99
   target_train_mse = 0.5
   print("Full model training")
-  train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    decoder, decoder_counter, train_indexies, [], True, target_train_accuracy, target_train_mse, "train_full_model")
+  train_acc = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
+                              reg_amount=FLAGS.reg_amount)(
+    decoder, decoder_counter, train_indexies, [], True, FLAGS.target_train_accuracy, target_train_mse,
+    "train_full_model")
 
-  if train_acc < target_train_accuracy:
+  if train_acc < FLAGS.target_train_accuracy:
     save_metric_result(train_acc - 1, "final_metric_result")
     return
 
   adver_decoder = tf.keras.Sequential(
-      [
-        tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-      ], name="adver_decoder"
+    [
+      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
+    ], name="adver_decoder"
   )
-  for _ in range(FLAGS.decoder_layers-1):
-    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  adver_decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  for _ in range(FLAGS.decoder_layers - 1):
+    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
+                                             kernel_regularizer=tf.keras.regularizers.l2(1)))
+  adver_decoder.add(
+    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("adver_decoder", adver_decoder.layers)
 
   print("Training Only Decoder")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, decoder_counter, train_indexies, [], False, .95, target_train_mse, "train_decoder")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
+                  reg_amount=FLAGS.reg_amount)(
+    adver_decoder, decoder_counter, train_indexies, [], False, FLAGS.target_train_accuracy - .04, target_train_mse,
+    "train_decoder")
 
   print("Training Only Decoder Adversarial")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, .98, target_train_mse, "train_decoder_adversarial")
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
+                  reg_amount=FLAGS.reg_amount)(
+    adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, FLAGS.target_train_accuracy - .02,
+    target_train_mse, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
@@ -342,6 +352,7 @@ def main(_):
     np.save(file, gen_boards)
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "adver_gen_boards"), 'wb') as file:
     np.save(file, adver_gen_boards)
+
 
 if __name__ == '__main__':
   app.run(main)

@@ -8,28 +8,12 @@ import os
 import train.visualize_metric
 from train.train import *
 
-
-
-train_acc_metric = tf.keras.metrics.BinaryAccuracy()
-train_mse_metric = tf.keras.metrics.MeanSquaredError()
-non_train_acc_metric = tf.keras.metrics.BinaryAccuracy()
-discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
-gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
-reg_loss_metric = tf.keras.metrics.Mean()
-metrics = [
-    ["train_acc", train_acc_metric],
-    ["train_mse", train_mse_metric],
-    ["non_train_acc", non_train_acc_metric],
-    ["discrim_acc", discrim_acc_metric],
-    ["gen_acc", gen_acc_metric],
-    ["reg loss", reg_loss_metric],
-]
-
-loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
-mse_loss = tf.keras.losses.MeanSquaredError()
-leak_relu = tf.keras.layers.LeakyReLU
-
 def main(_):
+  global acc_metrics, metrics
+  acc_metrics = [tf.keras.metrics.BinaryAccuracy() for _ in range(FLAGS.num_timesteps+1)]
+  for i in range(FLAGS.num_timesteps+1):
+    metrics.append(["acc at {}".format(i), acc_metrics[i]])
+
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, decoder, decoder_counter, model, discriminator = create_models(
@@ -43,7 +27,7 @@ def main(_):
   non_train_indexies = range(0, FLAGS.num_timesteps)
   target_train_mse = 0.3
   print("Full model training")
-  train_mse = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  train_mse = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics, reg_amount=FLAGS.reg_amount)(
     decoder, decoder_counter, train_indexies, [], True, .99, target_train_mse, "count_cells")
 
   if train_mse < target_train_mse:
@@ -61,11 +45,11 @@ def main(_):
   print("adver_decoder", adver_decoder.layers)
 
   print("Training Only Decoder")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics, reg_amount=FLAGS.reg_amount)(
     adver_decoder, decoder_counter, train_indexies, [], False, .96, -1, "train_decoder")
 
   print("Training Only Decoder Adversarial")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
+  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics, reg_amount=FLAGS.reg_amount)(
     adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, .98, -1, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
