@@ -12,9 +12,10 @@ flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_multi_integer('board_size', [20,20], '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
+flags.DEFINE_integer('count_cells', 0, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
-flags.DEFINE_integer('encoded_size', 32, '')
+flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
@@ -23,7 +24,6 @@ flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_integer('use_residual', 1, '')
 flags.DEFINE_integer('use_adverse', 1, '')
-
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
@@ -294,7 +294,10 @@ def main(_):
   # TODO: Lower learning rate as non train accuracy improves. Might help not mess up the hidden representations that it learned.
   discriminator_opt=tf.keras.optimizers.Adam()
 
-  train_indexies = [0,FLAGS.num_timesteps]
+  if FLAGS.count_cells:
+    train_indexies = 0
+  else:
+    train_indexies = [0,FLAGS.num_timesteps]
   non_train_indexies = range(1, FLAGS.num_timesteps)
   target_train_accuracy = .99
   target_train_mse = 0.5
