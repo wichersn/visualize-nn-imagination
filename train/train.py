@@ -14,7 +14,8 @@ flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 
-flags.DEFINE_float('target_train_accuracy', .99, '')
+flags.DEFINE_float('target_task_metric_val', .01, '')
+flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 8, '')
@@ -69,38 +70,38 @@ def gen_data_batch(size, skip):
   return datas
 
 # Model and training.
-def create_models(encoded_size, T, use_residual):
+def create_models():
   input_shape = FLAGS.board_size + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)
 
   encoder = tf.keras.Sequential(name="encoder")
   for _ in range(FLAGS.encoder_layers):
-    encoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
+    encoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
   print("encoder", encoder.layers)
 
   intermediates = [encoder(input_layer)]
 
   timestep_model = tf.keras.Sequential(name="timestep_model")
   for _ in range(FLAGS.timestep_layers):
-   timestep_model.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same',
+   timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
                          kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("timestep_model", timestep_model.layers)
 
-  for i in range(T):
+  for i in range(FLAGS.num_timesteps):
     timestep = timestep_model(intermediates[-1])
-    if use_residual:
+    if FLAGS.use_residual:
       timestep += intermediates[-1]
     intermediates.append(timestep)
 
   decoder = tf.keras.Sequential(name="decoder")
   for _ in range(FLAGS.decoder_layers-1):
-    decoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+    decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
   for _ in range(FLAGS.decoder_layers-1):
-    decoder_counter.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
   print("decoder_counter", decoder_counter.layers)
@@ -123,17 +124,27 @@ def create_models(encoded_size, T, use_residual):
       ], name="discriminator",
   )
 
-  return encoder, intermediates, decoder, decoder_counter, model, discriminator
+  adver_decoder = tf.keras.Sequential(
+    [
+      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
+    ], name="adver_decoder"
+  )
+  for _ in range(FLAGS.decoder_layers - 1):
+    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
+                                             kernel_regularizer=tf.keras.regularizers.l2(1)))
+  adver_decoder.add(
+    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("adver_decoder", adver_decoder.layers)
 
-def get_batch(datas, batch_size):
+  return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator
+
+def get_batch(datas, targets, batch_size):
     idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    targets = num_black_cells(datas[:, 0])
     return datas[idx], targets[idx]
 
-def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T, acc_metrics, decoder, decoder_task, task_loss_fn,
-                    use_autoencoder, train_index, indexes_to_adver, train_model, metric_prefix, task_metric, stop_metric_val, reg_amount=0):
+def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
+                    train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val, use_autoencoder=True):
   # task_metric: A metric that outputs a value greater than 0. Lower is better.
-
 
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
@@ -147,6 +158,9 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
   acc_metrics = [tf.keras.metrics.BinaryAccuracy() for _ in range(FLAGS.num_timesteps+1)]
   for i in range(FLAGS.num_timesteps+1):
     metrics.append(["acc at {}".format(i), acc_metrics[i]])
+
+  optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
+  discriminator_opt = tf.keras.optimizers.Adam()
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
     real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
@@ -169,9 +183,9 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
 
       reg_loss = sum(model.losses) + sum(decoder.losses)
       reg_loss_metric.update_state([reg_loss])
-      loss = reg_loss * reg_amount
+      loss = reg_loss * FLAGS.reg_amount
 
-      for i in range(T+1):
+      for i in range(FLAGS.num_timesteps+1):
         pred = decoder(model_outputs[i])
         if i == 0 and use_autoencoder:
           loss += loss_fn(outputs_batch[:, i], pred)
@@ -192,12 +206,16 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
           ran_discrim = True
 
       loss /= (1+use_autoencoder)
-    trainable_weights = None
-    trainable_weights += decoder_task.trainable_weights
-    trainable_weights += decoder.trainable_weights
 
-    if train_model:
+    trainable_weights = []
+    trainable_weights += decoder.trainable_weights
+    if decoder != decoder_task:
+      trainable_weights += decoder_task.trainable_weights
+    if should_train_model:
       trainable_weights += model.trainable_weights
+
+    print("trainable_weights", trainable_weights, flush=True)
+
     grads = tape.gradient(loss, trainable_weights)
     clip_val = .1
     grads = [(tf.clip_by_value(grad, -clip_val, clip_val)) for grad in grads]
@@ -207,7 +225,7 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       disctim_grads = disc_tape.gradient(discriminator_loss, discriminator.trainable_weights)
       discriminator_opt.apply_gradients(zip(disctim_grads, discriminator.trainable_weights))
     
-  def train_model():
+  def train_full():
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
     eval_datas = gen_data_batch(int(FLAGS.eval_data_size/100)+1, FLAGS.num_timesteps)
     non_train_indexies = range(1, FLAGS.num_timesteps)
@@ -218,10 +236,12 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
       metric.reset_states()
 
     for step_i in range(FLAGS.max_train_steps):
-      batch, targets = get_batch(datas, FLAGS.batch_size)
-      adver_batch, adver_targets = get_batch(datas, FLAGS.batch_size)
+      batch, batch_targets = get_batch(datas, targets, FLAGS.batch_size)
+      adver_batch, _ = get_batch(datas, targets, FLAGS.batch_size)
 
-      train_step(tf.constant(batch), tf.constant(targets), tf.constant(adver_batch))
+      # print(batch[:10], batch_targets[:10], adver_batch[:10], flush=True)
+
+      train_step(tf.constant(batch), tf.constant(batch_targets), tf.constant(adver_batch))
       if step_i % FLAGS.eval_interval == 0:
         with writer.as_default():
           for name, metric in metrics:
@@ -237,13 +257,13 @@ def get_train_model(model, discriminator, optimizer, datas, discriminator_opt, T
         writer.flush()
 
         print("=" * 100, flush=True)
-        if task_metric.result().numpy() < stop_metric_val and step_i > 0:
+        if task_metric.result().numpy() < target_task_metric_val and step_i > 0:
           return
 
         for name, metric in metrics:
           metric.reset_states()
 
-  return train_model
+  return train_full
 
 def np_sig(x):
   return 1/(1 + np.exp(-x)) 
@@ -277,57 +297,42 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_ind
   else:
     save_metric_result(regular_metric, "final_metric_result")
 
-
+class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
+  def result(self):
+    return 1 - super().result()
 
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
-  encoder, intermediates, decoder, decoder_counter, model, discriminator = create_models(
-    FLAGS.encoded_size, FLAGS.num_timesteps, FLAGS.use_residual)
+  encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
-  optimizer=tf.keras.optimizers.Adam(FLAGS.learning_rate)
-  # TODO: Lower learning rate as non train accuracy improves. Might help not mess up the hidden representations that it learned.
-  discriminator_opt=tf.keras.optimizers.Adam()
+  pred_state_metric = BinaryAccuracyInverseMetric()
 
-  if FLAGS.count_cells:
-    train_indexies = 0
-  else:
-    train_indexies = [0,FLAGS.num_timesteps]
+  # if FLAGS.count_cells:
+  #   task_metric = tf.keras.metrics.MeanSquaredError()
+  #   targets = num_black_cells(datas[:, FLAGS.num_timesteps])
+
+  targets = datas[:, FLAGS.num_timesteps]
+
   non_train_indexies = range(1, FLAGS.num_timesteps)
-  target_train_mse = 0.5
   print("Full model training")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
-                              reg_amount=FLAGS.reg_amount)(
-    decoder, decoder_counter, train_indexies, [], True, FLAGS.target_train_accuracy, target_train_mse,
-    "train_full_model")
+  decoder_task = decoder
+  task_loss_fn = loss_fn
 
-  if task_metric.result().numpy() < stop_metric_val:
-    save_metric_result(-task_metric.result().numpy(), "final_metric_result")
+  get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
+                      FLAGS.num_timesteps, [], True, "train_full_model", pred_state_metric, FLAGS.target_task_metric_val)()
+
+  if pred_state_metric.result().numpy() > FLAGS.target_task_metric_val:
+    save_metric_result(-pred_state_metric.result().numpy(), "final_metric_result")
     return
 
-  adver_decoder = tf.keras.Sequential(
-    [
-      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-    ], name="adver_decoder"
-  )
-  for _ in range(FLAGS.decoder_layers - 1):
-    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
-                                             kernel_regularizer=tf.keras.regularizers.l2(1)))
-  adver_decoder.add(
-    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("adver_decoder", adver_decoder.layers)
-
-  print("Training Only Decoder")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
-                  reg_amount=FLAGS.reg_amount)(
-    adver_decoder, decoder_counter, train_indexies, [], False, FLAGS.target_train_accuracy - .04, target_train_mse,
-    "train_decoder")
+  print("Training Only Decoder", flush=True)
+  get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
+                      FLAGS.num_timesteps, [], False, "train_decoder", pred_state_metric, FLAGS.target_task_metric_val+.05)()
 
   print("Training Only Decoder Adversarial")
-  get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, acc_metrics,
-                  reg_amount=FLAGS.reg_amount)(
-    adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, FLAGS.target_train_accuracy - .02,
-    target_train_mse, "train_decoder_adversarial")
+  get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
+                      FLAGS.num_timesteps, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_task_metric_val+.01)()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
