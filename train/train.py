@@ -22,6 +22,7 @@ flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_integer('use_residual', 1, '')
+flags.DEFINE_integer('use_adverse', 1, '')
 
 
 flags.DEFINE_string('job_dir', '',
@@ -268,12 +269,20 @@ loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0
 mse_loss = tf.keras.losses.MeanSquaredError()
 leak_relu = tf.keras.layers.LeakyReLU
 
-def save_metric_result(metric_result):
+def save_metric_result(metric_result, metric_name):
   writer = tf.summary.create_file_writer(FLAGS.job_dir)
-  print("final_metric_result", metric_result)
   with writer.as_default():
-    tf.summary.scalar("final_metric_result", metric_result, step=0)
+    tf.summary.scalar(metric_name, metric_result, step=0)
   writer.flush()
+
+def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
+  adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
+  regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
+  if FLAGS.use_adverse:
+    save_metric_result(adver_metric, "final_metric_result")
+  else:
+    save_metric_result(regular_metric, "final_metric_result")
+
 
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
@@ -294,7 +303,7 @@ def main(_):
     decoder, decoder_counter, train_indexies, [], True, target_train_accuracy, target_train_mse, "train_full_model")
 
   if train_acc < target_train_accuracy:
-    save_metric_result(train_acc - 1)
+    save_metric_result(train_acc - 1, "final_metric_result")
     return
 
   adver_decoder = tf.keras.Sequential(
@@ -319,10 +328,7 @@ def main(_):
   gen_boards = get_gen_boards(decoder, model_results)
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
 
-  metric_result = train.visualize_metric.combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
-  print("metric_result", metric_result, flush=True)
-
-  save_metric_result(metric_result)
+  save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
     np.save(file, eval_datas)

@@ -41,17 +41,13 @@ def main(_):
 
   train_indexies = [0]
   non_train_indexies = range(0, FLAGS.num_timesteps)
-  target_train_mse = 1
+  target_train_mse = 0.3
   print("Full model training")
   train_mse = get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
     decoder, decoder_counter, train_indexies, [], True, .99, target_train_mse, "count_cells")
-  #TESTING IF WE CAN COUNT CELLS
-  save_metric_result(train_mse)
-  return
-  
-  
-  if train_acc < target_train_accuracy:
-    save_metric_result(train_acc - 1)
+
+  if train_mse < target_train_mse:
+    save_metric_result(train_mse - 1, "final_metric_result")
     return
 
   adver_decoder = tf.keras.Sequential(
@@ -66,20 +62,17 @@ def main(_):
 
   print("Training Only Decoder")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, [], False, .96, -1, "train_decoder")
+    adver_decoder, decoder_counter, train_indexies, [], False, .96, -1, "train_decoder")
 
   print("Training Only Decoder Adversarial")
   get_train_model(model, discriminator, optimizer, datas, discriminator_opt, FLAGS.num_timesteps, reg_amount=FLAGS.reg_amount)(
-    adver_decoder, train_indexies, non_train_indexies, False, .98, -1, "train_decoder_adversarial")
+    adver_decoder, decoder_counter, train_indexies, non_train_indexies, False, .98, -1, "train_decoder_adversarial")
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
 
-  metric_result = train.visualize_metric.combine_metric(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
-  print("metric_result", metric_result, flush=True)
-
-  save_metric_result(metric_result)
+  save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
     np.save(file, eval_datas)
