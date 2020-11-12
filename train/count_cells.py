@@ -47,7 +47,7 @@ def main(_):
     decoder, decoder_counter, train_indexies, [], True, .99, target_train_mse, "count_cells")
 
   if train_mse < target_train_mse:
-    save_metric_result(train_mse - 1, "final_metric_result")
+    save_metric_result(1 - train_mse, "final_metric_result")
     return
 
   adver_decoder = tf.keras.Sequential(
