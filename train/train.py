@@ -189,6 +189,8 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
         pred = decoder(model_outputs[i])
         if i == 0 and use_autoencoder:
           loss += loss_fn(outputs_batch[:, i], pred)
+          if train_index == -1:
+            task_metric.update_state(outputs_batch[:, i], pred)
         if i == train_index:
           task_pred = decoder_task(model_outputs[i])
           loss += task_loss_fn(batch_targets, task_pred)
@@ -238,8 +240,6 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
     for step_i in range(FLAGS.max_train_steps):
       batch, batch_targets = get_batch(datas, targets, FLAGS.batch_size)
       adver_batch, _ = get_batch(datas, targets, FLAGS.batch_size)
-
-      # print(batch[:10], batch_targets[:10], adver_batch[:10], flush=True)
 
       train_step(tf.constant(batch), tf.constant(batch_targets), tf.constant(adver_batch))
       if step_i % FLAGS.eval_interval == 0:
@@ -307,32 +307,40 @@ def main(_):
   encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
   pred_state_metric = BinaryAccuracyInverseMetric()
-
-  # if FLAGS.count_cells:
-  #   task_metric = tf.keras.metrics.MeanSquaredError()
-  #   targets = num_black_cells(datas[:, FLAGS.num_timesteps])
-
-  targets = datas[:, FLAGS.num_timesteps]
-
   non_train_indexies = range(1, FLAGS.num_timesteps)
-  print("Full model training")
-  decoder_task = decoder
-  task_loss_fn = loss_fn
+  if FLAGS.count_cells:
+    task_metric = tf.keras.metrics.MeanSquaredError()
+    targets = num_black_cells(datas[:, FLAGS.num_timesteps])
+    task_loss_fn = mse_loss
+    decoder_task = decoder_counter
+    target_metric_val = FLAGS.target_task_metric_val
+  else:
+    task_metric = pred_state_metric
+    task_loss_fn = loss_fn
+    targets = datas[:, FLAGS.num_timesteps]
+    decoder_task = decoder
+    target_metric_val = FLAGS.target_pred_state_metric_val
 
+  print("Full model training")
   get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                      FLAGS.num_timesteps, [], True, "train_full_model", pred_state_metric, FLAGS.target_task_metric_val)()
+                      FLAGS.num_timesteps, [], True, "train_full_model", task_metric, target_metric_val)()
 
   if pred_state_metric.result().numpy() > FLAGS.target_task_metric_val:
     save_metric_result(-pred_state_metric.result().numpy(), "final_metric_result")
     return
 
+  if FLAGS.count_cells:
+    train_index = -1
+  else:
+    train_index = FLAGS.num_timesteps
+
   print("Training Only Decoder", flush=True)
   get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-                      FLAGS.num_timesteps, [], False, "train_decoder", pred_state_metric, FLAGS.target_task_metric_val+.05)()
+                      train_index, [], False, "train_decoder", pred_state_metric, FLAGS.target_pred_state_metric_val+.05)()
 
   print("Training Only Decoder Adversarial")
   get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-                      FLAGS.num_timesteps, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_task_metric_val+.01)()
+                      train_index, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_pred_state_metric_val+.01)()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
