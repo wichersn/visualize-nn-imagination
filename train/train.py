@@ -29,7 +29,27 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
                     train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val, use_autoencoder=True):
-  # task_metric: A metric that outputs a value greater than 0. Lower is better.
+  """ This training function was designed to be flexible to work with a variety of tasks.
+  The targets, decoder_task, task_loss_fn, task_metric and target_task_metric_val params should be different depending on the task.
+
+  @param model:
+  @param datas: The game of life board states
+  @param targets: The data for the network to predict.
+  @param decoder: The decoder to use to predict the game of life state.
+    This is used for adversarial or autoencoder training even when training on a different task.
+  @param decoder_task: The decoder to use for the task. Same as decoder if predicting life states.
+  @param discriminator:
+  @param task_loss_fn: The loss function to use for the task.
+  @param train_index: The index to calculate the loss of the model on the task.
+    If it's -1, it won't do task training, only adversarial or autoencoder.
+  @param indexes_to_adver:
+  @param should_train_model: If false, it only trains the decoder.
+  @param metric_prefix:
+  @param task_metric: A metric that outputs a value greater than 0. Lower is better.
+  @param target_task_metric_val: The training stops once the metric is lower than this value.
+  @param use_autoencoder:
+  @return: A function to use for training
+  """
 
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
@@ -192,6 +212,7 @@ def main(_):
 
   pred_state_metric = BinaryAccuracyInverseMetric()
   non_train_indexies = range(1, FLAGS.num_timesteps)
+  # Change the inputs to the train function depending on count_cells.
   if FLAGS.count_cells:
     task_metric = tf.keras.metrics.MeanSquaredError()
     targets = num_black_cells(datas[:, FLAGS.num_timesteps])
@@ -214,10 +235,11 @@ def main(_):
     return
 
   if FLAGS.count_cells:
-    train_index = -1
+    train_index = -1  # This makes it only train autoencoder and adversarial, not task loss.
   else:
     train_index = FLAGS.num_timesteps
 
+  # The decoder only and adverarial training uses the pred_state metric cause it's not doing any task specific training.
   print("Training Only Decoder", flush=True)
   get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
                       train_index, [], False, "train_decoder", pred_state_metric, FLAGS.target_pred_state_metric_val+.05)()
