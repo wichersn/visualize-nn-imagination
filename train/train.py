@@ -1,15 +1,15 @@
 import numpy as np
-from scipy.signal import convolve2d
 import tensorflow as tf
 from absl import app
 from absl import flags
 import os
 
 import train.visualize_metric
+from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.model_functions import create_models
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
-flags.DEFINE_multi_integer('board_size', [20,20], '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
@@ -17,130 +17,15 @@ flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_float('target_task_metric_val', .01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
-flags.DEFINE_integer('num_timesteps', 3, '')
-flags.DEFINE_integer('encoded_size', 8, '')
-flags.DEFINE_integer('encoder_layers', 2, '')
-flags.DEFINE_integer('timestep_layers', 3, '')
-flags.DEFINE_integer('decoder_layers', 2, '')
+flags.DEFINE_integer('use_adverse', 1, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
-flags.DEFINE_integer('use_residual', 1, '')
-flags.DEFINE_integer('use_adverse', 1, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
-
-#Training data functions
-def life_step(X):
-    nbrs_count = convolve2d(X, np.ones((3, 3)), mode='same', boundary='fill') - X
-    return (nbrs_count == 3) | (X & (nbrs_count == 2))
-
-def num_black_cells(X):
-    return np.sum(X, axis=(1, 2))
-
-def convert_model_in(data):
-  data = np.array(data)
-  data = data.astype(np.float32)
-  data = np.expand_dims(data, -1)
-  return data
-
-def gen_data_batch(size, skip):
-  datas = []
-  start_next = None
-  for _ in range(size):
-    if np.random.rand(1) < .1 or start_next is None:
-      life_state = np.random.rand(FLAGS.board_size[0], FLAGS.board_size[1]) > .5
-    else:
-      life_state = start_next
-
-    data = []
-    data.append(life_state)
-    for i in range(skip):
-      life_state = life_step(life_state)
-      data.append(life_state)
-      if i == 0:
-        start_next = life_state
-    datas.append(data)
-
-  datas = convert_model_in(datas)
-
-  return datas
-
-# Model and training.
-def create_models():
-  input_shape = FLAGS.board_size + [1, ]
-  input_layer = tf.keras.Input(shape=input_shape)
-
-  encoder = tf.keras.Sequential(name="encoder")
-  for _ in range(FLAGS.encoder_layers):
-    encoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
-  print("encoder", encoder.layers)
-
-  intermediates = [encoder(input_layer)]
-
-  timestep_model = tf.keras.Sequential(name="timestep_model")
-  for _ in range(FLAGS.timestep_layers):
-   timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
-                         kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("timestep_model", timestep_model.layers)
-
-  for i in range(FLAGS.num_timesteps):
-    timestep = timestep_model(intermediates[-1])
-    if FLAGS.use_residual:
-      timestep += intermediates[-1]
-    intermediates.append(timestep)
-
-  decoder = tf.keras.Sequential(name="decoder")
-  for _ in range(FLAGS.decoder_layers-1):
-    decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("decoder", decoder.layers)
-
-  decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  for _ in range(FLAGS.decoder_layers-1):
-    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  decoder_counter.add(tf.keras.layers.Flatten())
-  decoder_counter.add(tf.keras.layers.Dense(1))
-  print("decoder_counter", decoder_counter.layers)
-
-  model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
-
-  discriminator = tf.keras.Sequential(
-      [
-        tf.keras.layers.Conv2D(4, 3, strides=2, activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Conv2D(8, 3, strides=2, activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Conv2D(16, 3, strides=2, activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(1),
-      ], name="discriminator",
-  )
-
-  adver_decoder = tf.keras.Sequential(
-    [
-      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-    ], name="adver_decoder"
-  )
-  for _ in range(FLAGS.decoder_layers - 1):
-    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
-                                             kernel_regularizer=tf.keras.regularizers.l2(1)))
-  adver_decoder.add(
-    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("adver_decoder", adver_decoder.layers)
-
-  return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator
-
-def get_batch(datas, targets, batch_size):
-    idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    return datas[idx], targets[idx]
 
 def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
                     train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val, use_autoencoder=True):
@@ -229,7 +114,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
     
   def train_full():
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
-    eval_datas = gen_data_batch(int(FLAGS.eval_data_size/100)+1, FLAGS.num_timesteps)
+    eval_datas = gen_data_batch(int(FLAGS.eval_data_size / 100) + 1, FLAGS.num_timesteps)
     non_train_indexies = range(1, FLAGS.num_timesteps)
 
     last_train_metric = acc_metrics[train_index]
@@ -281,7 +166,6 @@ def get_gen_boards(decoder, model_results):
 
 loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
 mse_loss = tf.keras.losses.MeanSquaredError()
-leak_relu = tf.keras.layers.LeakyReLU
 
 def save_metric_result(metric_result, metric_name):
   writer = tf.summary.create_file_writer(FLAGS.job_dir)
