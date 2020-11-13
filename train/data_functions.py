@@ -43,6 +43,14 @@ def gen_data_batch(size, skip):
 
   return datas
 
+def plt_boards(boards):
+  """Use this function in get_batch to debug. Ex: plt_boards(datas[idx][0]), plt_boards(np.array([targets[idx][0]]))"""
+  f = plt.figure()
+  for i in range(len(boards)):
+    f.add_subplot(1,len(boards), i+1)
+    plt.imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
+    plt.axis('off')
+  plt.show()
 
 def get_batch(datas, targets, batch_size):
     idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
