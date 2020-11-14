@@ -6,6 +6,7 @@ import os
 from tensorflow import io
 import tensorflow as tf
 from absl import app
+import random
 
 FLAGS = flags.FLAGS
 
@@ -26,7 +27,8 @@ def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
         input_array_path = os.path.join(saved_array_dir, name)
         datas[name] = np.load(io.gfile.GFile(input_array_path, 'rb'))
 
-    for i in range(num_to_save):
+    for _ in range(num_to_save):
+        i = random.randint(0, len(datas[name])-1)
         fig, axes = plt.subplots(len(input_array_names), len(datas[name][i]))
         for pos, name in enumerate(input_array_names):
             plt_boards(datas[name][i], axes, pos)
@@ -40,7 +42,7 @@ def main(_):
                "adver_gen_boards": "Inferred with adver loss"}
 
     if FLAGS.is_hp_serach_root:
-        for i in range(1, 99999):
+        for i in range(1, 999):
             try:
                 save_imgs(os.path.join(FLAGS.job_dir, str(i)), os.path.join(FLAGS.job_dir, "imgs", str(i)),
                           input_array_names, 20)

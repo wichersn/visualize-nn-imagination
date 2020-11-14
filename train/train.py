@@ -13,6 +13,7 @@ flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
+flags.DEFINE_integer('use_autoencoder', 1, '')
 
 flags.DEFINE_float('target_task_metric_val', .01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
@@ -28,7 +29,7 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 
 
 def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                    train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val, use_autoencoder=True):
+                    train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val):
   """ This training function was designed to be flexible to work with a variety of tasks.
   The targets, decoder_task, task_loss_fn, task_metric and target_task_metric_val params should be different depending on the task.
 
@@ -47,7 +48,6 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   @param metric_prefix:
   @param task_metric: A metric that outputs a value greater than 0. Lower is better.
   @param target_task_metric_val: The training stops once the metric is lower than this value.
-  @param use_autoencoder:
   @return: A function to use for training
   """
 
@@ -92,7 +92,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
 
       for i in range(FLAGS.num_timesteps+1):
         pred = decoder(model_outputs[i])
-        if i == 0 and use_autoencoder:
+        if i == 0 and FLAGS.use_autoencoder:
           loss += loss_fn(outputs_batch[:, i], pred)
           if train_index == -1:
             task_metric.update_state(outputs_batch[:, i], pred)
@@ -112,7 +112,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
           loss += generator_loss
           ran_discrim = True
 
-      loss /= (1+use_autoencoder)
+      loss /= (1+FLAGS.use_autoencoder)
 
     trainable_weights = []
     trainable_weights += decoder.trainable_weights
@@ -120,8 +120,6 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
       trainable_weights += decoder_task.trainable_weights
     if should_train_model:
       trainable_weights += model.trainable_weights
-
-    print("trainable_weights", trainable_weights, flush=True)
 
     grads = tape.gradient(loss, trainable_weights)
     clip_val = .1
