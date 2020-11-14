@@ -8,24 +8,30 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
-    maxTrials: 30
+    maxTrials: 20
     maxParallelTrials: 5
     params:
-      - parameterName: num_timesteps
+      - parameterName: count_cells
         type: INTEGER
-        minValue: 2
-        maxValue: 3
+        minValue: 1
+        maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: encoder_layers
+      - parameterName: num_timesteps
         type: INTEGER
         minValue: 1
         maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: encoder_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 4
+        minValue: 3
         maxValue: 8
         scaleType: UNIT_LINEAR_SCALE
 
@@ -37,7 +43,7 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 4
+        minValue: 2
         maxValue: 40
         scaleType: UNIT_LINEAR_SCALE
 
@@ -49,7 +55,7 @@ trainingInput:
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: .00003
+        minValue: .000001
         maxValue: .003
         scaleType: UNIT_LOG_SCALE
 
@@ -61,6 +67,12 @@ trainingInput:
 
       - parameterName: use_residual
         type: INTEGER
-        minValue: 1
+        minValue: 0
         maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: eval_interval
+        type: INTEGER
+        minValue: 5000
+        maxValue: 5000
         scaleType: UNIT_LINEAR_SCALE
