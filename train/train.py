@@ -15,7 +15,7 @@ flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 
-flags.DEFINE_float('target_task_metric_val', .01, '')
+flags.DEFINE_float('target_task_metric_val', 2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('use_adverse', 1, '')
@@ -228,8 +228,8 @@ def main(_):
   get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
                       FLAGS.num_timesteps, [], True, "train_full_model", task_metric, target_metric_val)()
 
-  if pred_state_metric.result().numpy() > FLAGS.target_task_metric_val:
-    save_metric_result(-pred_state_metric.result().numpy(), "final_metric_result")
+  if task_metric.result().numpy() > FLAGS.target_task_metric_val:
+    save_metric_result(-task_metric.result().numpy(), "final_metric_result")
     return
 
   if FLAGS.count_cells:
