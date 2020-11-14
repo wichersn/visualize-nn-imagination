@@ -29,7 +29,7 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 
 
 def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                    train_index, indexes_to_adver, should_train_model, metric_prefix, task_metric, target_task_metric_val):
+                    train_index, indexes_to_adver, non_train_indexies, should_train_model, metric_prefix, task_metric, target_task_metric_val):
   """ This training function was designed to be flexible to work with a variety of tasks.
   The targets, decoder_task, task_loss_fn, task_metric and target_task_metric_val params should be different depending on the task.
 
@@ -44,6 +44,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   @param train_index: The index to calculate the loss of the model on the task.
     If it's -1, it won't do task training, only adversarial or autoencoder.
   @param indexes_to_adver:
+  @param non_train_indexies: Indexes to cacluate the metric on.
   @param should_train_model: If false, it only trains the decoder.
   @param metric_prefix:
   @param task_metric: A metric that outputs a value greater than 0. Lower is better.
@@ -133,9 +134,6 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   def train_full():
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
     eval_datas = gen_data_batch(int(FLAGS.eval_data_size / 100) + 1, FLAGS.num_timesteps)
-    non_train_indexies = range(1, FLAGS.num_timesteps)
-
-    last_train_metric = acc_metrics[train_index]
 
     for name, metric in metrics:
       metric.reset_states()
@@ -153,6 +151,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
 
           model_results = model(eval_datas[:, 0])
           gen_boards = get_gen_boards(decoder, model_results)
+          print("eval_datas", eval_datas.shape, "gen_boards", gen_boards.shape, "non_train_indexies", non_train_indexies)
           visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
           print("visualize_metric_result", visualize_metric_result)
           tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
@@ -209,15 +208,19 @@ def main(_):
   encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
   pred_state_metric = BinaryAccuracyInverseMetric()
-  non_train_indexies = range(1, FLAGS.num_timesteps)
+
   # Change the inputs to the train function depending on count_cells.
   if FLAGS.count_cells:
+    non_train_indexies = range(1, FLAGS.num_timesteps+1) # Also use the last ts for adver training and metric.
+    # Because the last timestep isn't trained to represent a game of life state.
+    print("non_train_indexies", non_train_indexies)
     task_metric = tf.keras.metrics.MeanSquaredError()
     targets = num_black_cells(datas[:, FLAGS.num_timesteps])
     task_loss_fn = mse_loss
     decoder_task = decoder_counter
     target_metric_val = FLAGS.target_task_metric_val
   else:
+    non_train_indexies = range(1, FLAGS.num_timesteps)
     task_metric = pred_state_metric
     task_loss_fn = loss_fn
     targets = datas[:, FLAGS.num_timesteps]
@@ -226,7 +229,7 @@ def main(_):
 
   print("Full model training")
   get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                      FLAGS.num_timesteps, [], True, "train_full_model", task_metric, target_metric_val)()
+                      FLAGS.num_timesteps, [], non_train_indexies, True, "train_full_model", task_metric, target_metric_val)()
 
   if task_metric.result().numpy() > FLAGS.target_task_metric_val:
     save_metric_result(-task_metric.result().numpy(), "final_metric_result")
@@ -240,11 +243,11 @@ def main(_):
   # The decoder only and adverarial training uses the pred_state metric cause it's not doing any task specific training.
   print("Training Only Decoder", flush=True)
   get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-                      train_index, [], False, "train_decoder", pred_state_metric, FLAGS.target_pred_state_metric_val+.05)()
+                      train_index, [], non_train_indexies, False, "train_decoder", pred_state_metric, FLAGS.target_pred_state_metric_val+.05)()
 
   print("Training Only Decoder Adversarial")
   get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-                      train_index, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_pred_state_metric_val+.01)()
+                      train_index, non_train_indexies, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_pred_state_metric_val+.01)()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
