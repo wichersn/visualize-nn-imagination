@@ -18,7 +18,6 @@ flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_float('target_task_metric_val', 2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
-flags.DEFINE_integer('use_adverse', 1, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
@@ -193,10 +192,9 @@ def save_metric_result(metric_result, metric_name):
 def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
   adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
   regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
-  if FLAGS.use_adverse:
-    save_metric_result(adver_metric, "final_metric_result")
-  else:
-    save_metric_result(regular_metric, "final_metric_result")
+  save_metric_result(adver_metric, "adver_metric_result")
+  save_metric_result(regular_metric, "regular_metric_result")
+  save_metric_result(max(regular_metric, adver_metric), "final_metric_result")
 
 class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
