@@ -8,8 +8,17 @@ flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
 flags.DEFINE_integer('use_residual', 1, '')
+flags.DEFINE_integer('use_rnn', 1, '')
 
 leak_relu = tf.keras.layers.LeakyReLU
+
+def create_timestep_model(name=''):
+  timestep_model = tf.keras.Sequential(name="timestep_model"+name)
+  for _ in range(FLAGS.timestep_layers):
+   timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
+                         kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("timestep_model", timestep_model.layers)
+  return timestep_model
 
 def create_models():
   input_shape = FLAGS.board_size + [1, ]
@@ -22,13 +31,12 @@ def create_models():
 
   intermediates = [encoder(input_layer)]
 
-  timestep_model = tf.keras.Sequential(name="timestep_model")
-  for _ in range(FLAGS.timestep_layers):
-   timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
-                         kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("timestep_model", timestep_model.layers)
-
+  if FLAGS.use_rnn:
+    timestep_model = create_timestep_model()
   for i in range(FLAGS.num_timesteps):
+    if not FLAGS.use_rnn:
+      timestep_model = create_timestep_model('_'+str(i))
+
     timestep = timestep_model(intermediates[-1])
     if FLAGS.use_residual:
       timestep += intermediates[-1]

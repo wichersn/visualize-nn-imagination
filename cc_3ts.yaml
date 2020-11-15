@@ -11,6 +11,12 @@ trainingInput:
     maxTrials: 20
     maxParallelTrials: 5
     params:
+      - parameterName: use_autoencoder
+        type: INTEGER
+        minValue: 0
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: num_timesteps
         type: INTEGER
         minValue: 3
