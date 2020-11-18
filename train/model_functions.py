@@ -21,7 +21,7 @@ def create_timestep_model(name=''):
   return timestep_model
 
 def create_models():
-  input_shape = FLAGS.board_size + [1, ]
+  input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)
 
   encoder = tf.keras.Sequential(name="encoder")
@@ -59,13 +59,13 @@ def create_models():
 
   discriminator = tf.keras.Sequential(
       [
-        tf.keras.layers.Conv2D(4, 3, strides=2, activation=leak_relu()),
+        tf.keras.layers.Conv2D(4, 3, strides=2, padding='same', activation=leak_relu()),
         tf.keras.layers.Dropout(0.3),
 
-        tf.keras.layers.Conv2D(8, 3, strides=2, activation=leak_relu()),
+        tf.keras.layers.Conv2D(8, 3, strides=2, padding='same', activation=leak_relu()),
         tf.keras.layers.Dropout(0.3),
 
-        tf.keras.layers.Conv2D(16, 3, strides=2, activation=leak_relu()),
+        tf.keras.layers.Conv2D(16, 3, strides=2, padding='same', activation=leak_relu()),
         tf.keras.layers.Dropout(0.3),
 
         tf.keras.layers.Flatten(),
