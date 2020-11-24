@@ -42,6 +42,8 @@ def create_models():
       timestep += intermediates[-1]
     intermediates.append(timestep)
 
+  large_intermediates = intermediates + intermediates[1:]
+
   decoder = tf.keras.Sequential(name="decoder")
   for _ in range(FLAGS.decoder_layers-1):
     decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
@@ -56,6 +58,7 @@ def create_models():
   print("decoder_counter", decoder_counter.layers)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
+  large_model = tf.keras.Model(inputs=input_layer, outputs=large_intermediates)
 
   discriminator = tf.keras.Sequential(
       [
@@ -85,4 +88,4 @@ def create_models():
     tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("adver_decoder", adver_decoder.layers)
 
-  return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator
+  return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator, large_model

@@ -15,6 +15,8 @@ flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 
+flags.DEFINE_integer('duplicate', 0, '')
+
 flags.DEFINE_float('target_task_metric_val', 2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
@@ -203,7 +205,8 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
-  encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
+  large_eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps * 2)
+  encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator, large_model = create_models()
 
   pred_state_metric = BinaryAccuracyInverseMetric()
 
@@ -249,7 +252,17 @@ def main(_):
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gen_boards(decoder, model_results)
+
+  if FLAGS.duplicate:
+    model_outputs = model(large_eval_datas[:, 0])
+    pred = decoder(model_outputs[-1])
+    loss = loss_fn(large_eval_datas[:, -1], pred)
+    save_metric_result(-loss, "final_metric_result")
+    return
+
+
   adver_gen_boards = get_gen_boards(adver_decoder, model_results)
+
 
   save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
