@@ -29,6 +29,12 @@ trainingInput:
         maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: random_board_prob
+        type: DOUBLE
+        minValue: 1.0
+        maxValue: 1.0
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 3

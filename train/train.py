@@ -267,7 +267,6 @@ def main(_):
 
   if FLAGS.count_cells:
     task_gen = get_gens(decoder_task, model_results, False)
-    print("task_gen", task_gen[:100])
     save_np(task_gen, "task_gen")
 
 if __name__ == '__main__':
