@@ -25,7 +25,7 @@ def gen_data_batch(size, skip):
   datas = []
   start_next = None
   for _ in range(size):
-    if np.random.rand(1) < .1 or start_next is None:
+    if np.random.rand(1) < 1 or start_next is None:
       life_state = np.random.rand(FLAGS.board_size, FLAGS.board_size) > .5
     else:
       life_state = start_next

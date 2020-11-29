@@ -30,19 +30,27 @@ def create_models():
   print("encoder", encoder.layers)
 
   intermediates = [encoder(input_layer)]
+  timestep_models = []
 
   if FLAGS.use_rnn:
     timestep_model = create_timestep_model()
   for i in range(FLAGS.num_timesteps):
     if not FLAGS.use_rnn:
-      timestep_model = create_timestep_model('_'+str(i))
+      timestep_models.append(create_timestep_model('_'+str(i)))
+    else:
+      timestep_models.append(timestep_model)
 
-    timestep = timestep_model(intermediates[-1])
+    timestep = timestep_models[-1](intermediates[-1])
     if FLAGS.use_residual:
       timestep += intermediates[-1]
     intermediates.append(timestep)
 
-  large_intermediates = intermediates + intermediates[1:]
+  large_intermediates = intermediates
+  for i in range(FLAGS.num_timesteps):
+    timestep = timestep_models[i](intermediates[-1])
+    if FLAGS.use_residual:
+      timestep += intermediates[-1]
+    intermediates.append(timestep)
 
   decoder = tf.keras.Sequential(name="decoder")
   for _ in range(FLAGS.decoder_layers-1):
