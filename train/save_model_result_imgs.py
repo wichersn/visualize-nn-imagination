@@ -7,6 +7,7 @@ from tensorflow import io
 import tensorflow as tf
 from absl import app
 import random
+from data_functions import num_black_cells
 
 FLAGS = flags.FLAGS
 
@@ -27,12 +28,26 @@ def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
         input_array_path = os.path.join(saved_array_dir, name)
         datas[name] = np.load(io.gfile.GFile(input_array_path, 'rb'))
 
+    task_gen = None
+    try:
+        input_array_path = os.path.join(saved_array_dir, "task_gen")
+        task_gen = np.load(io.gfile.GFile(input_array_path, 'rb'))
+    except tf.python.framework.errors_impl.NotFoundError:
+        pass
+
     for _ in range(num_to_save):
         i = random.randint(0, len(datas[name])-1)
         fig, axes = plt.subplots(len(input_array_names), len(datas[name][i]))
         for pos, name in enumerate(input_array_names):
             plt_boards(datas[name][i], axes, pos)
-        img_file = io.gfile.GFile(os.path.join(ouput_dir, str(i)+".png"), 'wb')
+
+        if task_gen is not None:
+            task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
+            error = task_gen[i, -1] - task_gt
+            file_name = "{}_error{:.4f}.png".format(i, error)
+        else:
+            file_name = "{}.png".format(i)
+        img_file = io.gfile.GFile(os.path.join(ouput_dir, file_name), 'wb')
         plt.savefig(img_file)
     plt.close('all')
 
@@ -48,7 +63,6 @@ def main(_):
                           input_array_names, 20)
             except tf.python.framework.errors_impl.NotFoundError:
                 print("No eval for", i)
-                pass
     else:
         save_imgs(FLAGS.job_dir, os.path.join(FLAGS.job_dir, "imgs"), input_array_names, 20)
 

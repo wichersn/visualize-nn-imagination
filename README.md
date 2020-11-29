@@ -15,9 +15,9 @@ Replace these paths with the ones you want to see
 # Get images
 This will add the images to a `img` directory in `gs://visualize-nn-imagination-runs/full_hp_gpu_p100_605262`
     
-    python3 -m train.save_model_result_imgs --is_hp_serach_root --job_dir gs://visualize-nn-imagination-runs/test_count_vis_metric_3136679
+    python3 -m train.save_model_result_imgs --is_hp_serach_root --job_dir gs://visualize-nn-imagination-runs/cc_count_3ts_5x5board_3875040
         
 Download them with 
 
-    gsutil cp -r gs://visualize-nn-imagination-runs/test_count_vis_metric_3136679/imgs/* some_local_dir
+    gsutil cp -mr gs://visualize-nn-imagination-runs/cc_count_3ts_save_pred_4823824/imgs/* /Users/wichersn/visualize_nn_runs/cc_count_3ts_save_pred_4823824
     

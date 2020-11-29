@@ -15,7 +15,7 @@ flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 
-flags.DEFINE_float('target_task_metric_val', 2, '')
+flags.DEFINE_float('target_task_metric_val', .2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
@@ -149,7 +149,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
           model_results = model(eval_datas[:, 0])
-          gen_boards = get_gen_boards(decoder, model_results)
+          gen_boards = get_gens(decoder, model_results, True)
           print("eval_datas", eval_datas.shape, "gen_boards", gen_boards.shape, "non_train_indexies", non_train_indexies)
           visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
           print("visualize_metric_result", visualize_metric_result)
@@ -170,14 +170,18 @@ def np_sig(x):
   return 1/(1 + np.exp(-x)) 
 
 
-def get_gen_boards(decoder, model_results):
+def get_gens(decoder, model_results, is_img):
   gen_boards = []
   for i in range(len(model_results)):
     gen_boards.append(decoder(model_results[i]).numpy())
-
   gen_boards = np.array(gen_boards)
-  gen_boards = np_sig(gen_boards)
-  gen_boards = np.transpose(gen_boards, (1,0,2,3,4))
+
+  if is_img:
+    gen_boards = np_sig(gen_boards)
+    gen_boards = np.transpose(gen_boards, (1,0,2,3,4))
+  else:
+    gen_boards = np.transpose(gen_boards, (1, 0, 2))
+    gen_boards = np.squeeze(gen_boards, 2)
   return gen_boards
 
 loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
@@ -199,6 +203,10 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_ind
 class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
     return 1 - super().result()
+
+def save_np(data, name):
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
+    np.save(file, data)
 
 def main(_):
   datas = gen_data_batch(100000, FLAGS.num_timesteps)
@@ -248,18 +256,19 @@ def main(_):
                       train_index, non_train_indexies, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_pred_state_metric_val+.01)()
 
   model_results = model(eval_datas[:, 0])
-  gen_boards = get_gen_boards(decoder, model_results)
-  adver_gen_boards = get_gen_boards(adver_decoder, model_results)
+  gen_boards = get_gens(decoder, model_results, True)
+  adver_gen_boards = get_gens(adver_decoder, model_results, True)
 
   save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
-  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "eval_datas"), 'wb') as file:
-    np.save(file, eval_datas)
-  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "gen_boards"), 'wb') as file:
-    np.save(file, gen_boards)
-  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, "adver_gen_boards"), 'wb') as file:
-    np.save(file, adver_gen_boards)
+  save_np(eval_datas, "eval_datas")
+  save_np(gen_boards, "gen_boards")
+  save_np(adver_gen_boards, "adver_gen_boards")
 
+  if FLAGS.count_cells:
+    task_gen = get_gens(decoder_task, model_results, False)
+    print("task_gen", task_gen[:100])
+    save_np(task_gen, "task_gen")
 
 if __name__ == '__main__':
   app.run(main)
