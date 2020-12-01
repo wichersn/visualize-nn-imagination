@@ -7,6 +7,8 @@ flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
+flags.DEFINE_integer('decoder_counter_layers', 2, 'Only used for the count cells task.')
+flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('use_residual', 1, '')
 flags.DEFINE_integer('use_rnn', 1, '')
 
@@ -49,8 +51,8 @@ def create_models():
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  for _ in range(FLAGS.decoder_layers-1):
-    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  for _ in range(FLAGS.decoder_counter_layers-1):
+    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, strides=FLAGS.decoder_counter_strides, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
   print("decoder_counter", decoder_counter.layers)
