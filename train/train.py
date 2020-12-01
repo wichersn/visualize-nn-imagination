@@ -5,7 +5,7 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch, plt_boards
+from train.data_functions import num_black_cells, gen_data_batch, get_batch
 from train.model_functions import create_models
 
 FLAGS = flags.FLAGS
@@ -14,7 +14,7 @@ flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
-flags.DEFINE_integer('use_task_autoencoder', 1, '')
+flags.DEFINE_integer('use_task_autoencoder', 0, '')
 
 flags.DEFINE_float('target_task_metric_val', .2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
@@ -77,7 +77,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
     total_loss = real_loss + fake_loss
     return total_loss
 
-  # @tf.function
+  @tf.function
   def train_step(batch, batch_targets, adver_batch):
     inputs_batch = batch[:, 0]
     outputs_batch = batch
@@ -91,9 +91,6 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
       reg_loss_metric.update_state([reg_loss])
       loss = reg_loss * FLAGS.reg_amount
 
-      print(batch_targets[0])
-      plt_boards(batch[0])
-
       for i in range(FLAGS.num_timesteps+1):
         pred = decoder(model_outputs[i])
         if (i == 0) and FLAGS.use_autoencoder:
@@ -103,7 +100,8 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
         if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder):
           task_pred = decoder_task(model_outputs[i])
           loss += task_loss_fn(batch_targets[:, i], task_pred)
-          task_metric.update_state(batch_targets[:, i], task_pred)
+          if i > 0:
+            task_metric.update_state(batch_targets[:, i], task_pred)
 
         acc_metrics[i].update_state(outputs_batch[:, i], pred)
 

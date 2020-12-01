@@ -29,6 +29,12 @@ trainingInput:
         maxValue: 10
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: use_task_autoencoder
+        type: INTEGER
+        minValue: 0
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: random_board_prob
         type: DOUBLE
         minValue: 1.0
@@ -51,6 +57,18 @@ trainingInput:
         type: INTEGER
         minValue: 1
         maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_counter_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_counter_strides
+        type: INTEGER
+        minValue: 1
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoded_size
