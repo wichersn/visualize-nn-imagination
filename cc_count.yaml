@@ -8,7 +8,7 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
-    maxTrials: 30
+    maxTrials: 20
     maxParallelTrials: 5
     params:
       - parameterName: count_cells
@@ -44,12 +44,12 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 1
-        maxValue: 3
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 2
+        minValue: 4
         maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
@@ -85,8 +85,8 @@ trainingInput:
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: .0000003
-        maxValue: .0001
+        minValue: 0.000001
+        maxValue: 0.0001
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount

@@ -14,7 +14,7 @@ flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
-flags.DEFINE_integer('use_task_autoencoder', 0, '')
+flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
 flags.DEFINE_float('target_task_metric_val', .2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
@@ -97,7 +97,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
           loss += loss_fn(outputs_batch[:, i], pred)
           if train_index == -1:
             task_metric.update_state(outputs_batch[:, i], pred)
-        if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder):
+        if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder and (train_index > -1)):
           task_pred = decoder_task(model_outputs[i])
           loss += task_loss_fn(batch_targets[:, i], task_pred)
           if i > 0:
