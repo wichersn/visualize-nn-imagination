@@ -21,6 +21,7 @@ flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
+flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
@@ -65,7 +66,10 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   for i in range(FLAGS.num_timesteps+1):
     metrics.append(["acc at {}".format(i), acc_metrics[i]])
 
-  optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
+  lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
+                                                               decay_steps=100000,
+                                                               decay_rate=FLAGS.lr_decay_rate_per1M_steps)
+  optimizer = tf.keras.optimizers.Adam(lr_schedule)
   discriminator_opt = tf.keras.optimizers.Adam()
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
