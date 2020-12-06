@@ -73,7 +73,7 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 10
+        minValue: 2
         maxValue: 30
         scaleType: UNIT_LINEAR_SCALE
 
