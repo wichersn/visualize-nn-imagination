@@ -41,12 +41,13 @@ def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
         for pos, name in enumerate(input_array_names):
             plt_boards(datas[name][i], axes, pos)
 
-        if task_gen is not None:
-            task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
-            error = task_gen[i, -1] - task_gt
-            file_name = "{}_error{:.4f}.png".format(i, error)
-        else:
-            file_name = "{}.png".format(i)
+        # if task_gen is not None:
+        #     task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
+        #     error = task_gen[i, -1] - task_gt
+        #     file_name = "{}_error{:.4f}.png".format(i, error)
+        # else:
+        #     file_name = "{}.png".format(i)
+        file_name = "{}.png".format(i)
         img_file = io.gfile.GFile(os.path.join(ouput_dir, file_name), 'wb')
         plt.savefig(img_file)
     plt.close('all')
