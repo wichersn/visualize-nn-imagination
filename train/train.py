@@ -45,7 +45,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   @param train_index: The index to calculate the loss of the model on the task.
     If it's -1, it won't do task training, only adversarial or autoencoder.
   @param indexes_to_adver:
-  @param non_train_indexies: Indexes to cacluate the metric on.
+  @param non_train_indexies: Indexes to calculate the metric on.
   @param should_train_model: If false, it only trains the decoder.
   @param metric_prefix:
   @param task_metric: A metric that outputs a value greater than 0. Lower is better.
@@ -65,6 +65,11 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   acc_metrics = [tf.keras.metrics.BinaryAccuracy() for _ in range(FLAGS.num_timesteps+1)]
   for i in range(FLAGS.num_timesteps+1):
     metrics.append(["acc at {}".format(i), acc_metrics[i]])
+
+  # Create other task metrics for other timesteps with the same class as task_metric
+  all_task_metrics = [type(task_metric)() for _ in range(FLAGS.num_timesteps+1)]
+  for i in range(FLAGS.num_timesteps+1):
+    metrics.append(["task metric at {}".format(i), all_task_metrics[i]])
 
   lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
                                                                decay_steps=100000,
@@ -97,17 +102,20 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
 
       for i in range(FLAGS.num_timesteps+1):
         pred = decoder(model_outputs[i])
+        acc_metrics[i].update_state(outputs_batch[:, i], pred)
+
         if (i == 0) and FLAGS.use_autoencoder:
           loss += loss_fn(outputs_batch[:, i], pred)
           if train_index == -1:
             task_metric.update_state(outputs_batch[:, i], pred)
-        if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder and (train_index > -1)):
-          task_pred = decoder_task(model_outputs[i])
-          loss += task_loss_fn(batch_targets[:, i], task_pred)
-          if i > 0:
-            task_metric.update_state(batch_targets[:, i], task_pred)
 
-        acc_metrics[i].update_state(outputs_batch[:, i], pred)
+        if train_index > -1:
+          task_pred = decoder_task(model_outputs[i])
+          all_task_metrics[i].update_state(batch_targets[:, i], task_pred)
+          if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder):
+            loss += task_loss_fn(batch_targets[:, i], task_pred)
+            if i > 0:
+              task_metric.update_state(batch_targets[:, i], task_pred)
 
         if i in indexes_to_adver:
           discrim_on_pred = discriminator(tf.math.sigmoid(pred))
