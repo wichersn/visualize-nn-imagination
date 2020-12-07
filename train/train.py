@@ -14,12 +14,14 @@ flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
+flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
 flags.DEFINE_float('target_task_metric_val', .2, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
+flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
@@ -43,7 +45,7 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   @param train_index: The index to calculate the loss of the model on the task.
     If it's -1, it won't do task training, only adversarial or autoencoder.
   @param indexes_to_adver:
-  @param non_train_indexies: Indexes to cacluate the metric on.
+  @param non_train_indexies: Indexes to calculate the metric on.
   @param should_train_model: If false, it only trains the decoder.
   @param metric_prefix:
   @param task_metric: A metric that outputs a value greater than 0. Lower is better.
@@ -64,7 +66,15 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
   for i in range(FLAGS.num_timesteps+1):
     metrics.append(["acc at {}".format(i), acc_metrics[i]])
 
-  optimizer = tf.keras.optimizers.Adam(FLAGS.learning_rate)
+  # Create other task metrics for other timesteps with the same class as task_metric
+  all_task_metrics = [type(task_metric)() for _ in range(FLAGS.num_timesteps+1)]
+  for i in range(FLAGS.num_timesteps+1):
+    metrics.append(["task metric at {}".format(i), all_task_metrics[i]])
+
+  lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
+                                                               decay_steps=100000,
+                                                               decay_rate=FLAGS.lr_decay_rate_per1M_steps)
+  optimizer = tf.keras.optimizers.Adam(lr_schedule)
   discriminator_opt = tf.keras.optimizers.Adam()
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
@@ -92,16 +102,20 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
 
       for i in range(FLAGS.num_timesteps+1):
         pred = decoder(model_outputs[i])
-        if i == 0 and FLAGS.use_autoencoder:
+        acc_metrics[i].update_state(outputs_batch[:, i], pred)
+
+        if (i == 0) and FLAGS.use_autoencoder:
           loss += loss_fn(outputs_batch[:, i], pred)
           if train_index == -1:
             task_metric.update_state(outputs_batch[:, i], pred)
-        if i == train_index:
-          task_pred = decoder_task(model_outputs[i])
-          loss += task_loss_fn(batch_targets, task_pred)
-          task_metric.update_state(batch_targets, task_pred)
 
-        acc_metrics[i].update_state(outputs_batch[:, i], pred)
+        if train_index > -1:
+          task_pred = decoder_task(model_outputs[i])
+          all_task_metrics[i].update_state(batch_targets[:, i], task_pred)
+          if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder):
+            loss += task_loss_fn(batch_targets[:, i], task_pred)
+            if i > 0:
+              task_metric.update_state(batch_targets[:, i], task_pred)
 
         if i in indexes_to_adver:
           discrim_on_pred = discriminator(tf.math.sigmoid(pred))
@@ -221,7 +235,7 @@ def main(_):
     # Because the last timestep isn't trained to represent a game of life state.
     print("non_train_indexies", non_train_indexies)
     task_metric = tf.keras.metrics.MeanSquaredError()
-    targets = num_black_cells(datas[:, FLAGS.num_timesteps])
+    targets = num_black_cells(datas)
     task_loss_fn = mse_loss
     decoder_task = decoder_counter
     target_metric_val = FLAGS.target_task_metric_val
@@ -229,7 +243,7 @@ def main(_):
     non_train_indexies = range(1, FLAGS.num_timesteps)
     task_metric = pred_state_metric
     task_loss_fn = loss_fn
-    targets = datas[:, FLAGS.num_timesteps]
+    targets = datas
     decoder_task = decoder
     target_metric_val = FLAGS.target_pred_state_metric_val
 
