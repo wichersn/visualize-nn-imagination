@@ -12,7 +12,7 @@ def life_step(X):
 
 
 def num_black_cells(X):
-    return np.sum(X, axis=(1, 2))
+    return np.sum(X, axis=(-1, -2, -3))
 
 
 def convert_model_in(data):
@@ -46,8 +46,11 @@ def gen_data_batch(size, skip):
 
 def plt_boards(boards):
   """Use this function in get_batch to debug. Ex: plt_boards(datas[idx][0]), plt_boards(np.array([targets[idx][0]]))"""
+  import matplotlib.pyplot as plt
+
   f = plt.figure()
   for i in range(len(boards)):
+    # print("batch_targets", batch_targets[i])
     f.add_subplot(1,len(boards), i+1)
     plt.imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
     plt.axis('off')
