@@ -44,25 +44,25 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 3
+        minValue: 4
         maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
         type: INTEGER
-        minValue: 1
-        maxValue: 3
+        minValue: 2
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_layers
         type: INTEGER
-        minValue: 2
-        maxValue: 3
+        minValue: 3
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_strides
@@ -91,8 +91,8 @@ trainingInput:
 
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
-        minValue: .4
-        maxValue: .7
+        minValue: .3
+        maxValue: .6
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount

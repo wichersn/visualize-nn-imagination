@@ -19,5 +19,5 @@ This will add the images to a `img` directory in `gs://visualize-nn-imagination-
         
 Download them with 
 
-    gsutil cp -r gs://visualize-nn-imagination-runs/cc_count_1ts_10x10_lrdecay_small_range_taskautenc_5423274/imgs/* /Users/wichersn/visualize_nn_runs/cc_count_1ts_10x10_lrdecay_small_range_taskautenc_5423274
+    gsutil cp -r gs://visualize-nn-imagination-runs/cc_count5x5_2ts_task_autoenc_harder_target_5692650/imgs/* /Users/wichersn/visualize_nn_runs/cc_count5x5_2ts_task_autoenc_harder_target_5692650
     

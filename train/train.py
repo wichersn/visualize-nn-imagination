@@ -16,7 +16,7 @@ flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
-flags.DEFINE_float('target_task_metric_val', .2, '')
+flags.DEFINE_float('target_task_metric_val', .01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
