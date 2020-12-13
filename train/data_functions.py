@@ -56,6 +56,6 @@ def plt_boards(boards):
     plt.axis('off')
   plt.show()
 
-def get_batch(datas, targets, batch_size):
+def get_batch(datas, batch_size):
     idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    return datas[idx], targets[idx]
+    return datas[idx]

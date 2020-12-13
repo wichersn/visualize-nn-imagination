@@ -7,6 +7,8 @@ import os
 import train.visualize_metric
 from train.data_functions import num_black_cells, gen_data_batch, get_batch
 from train.model_functions import create_models
+from collections import namedtuple
+
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
@@ -28,48 +30,42 @@ flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
+# class TaskInfo:
+#   def __init__(self, name, train_indexes, data_fn, decoder, loss_fn, metric_class, target_metric_val):
+#     self.name, train_indexes, data_fn, decoder, loss_fn, metric_class, target_metric_val
 
-def get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                    train_index, indexes_to_adver, non_train_indexies, should_train_model, metric_prefix, task_metric, target_task_metric_val):
-  """ This training function was designed to be flexible to work with a variety of tasks.
-  The targets, decoder_task, task_loss_fn, task_metric and target_task_metric_val params should be different depending on the task.
+TaskInfo = namedtuple("TaskInfo", ['name', 'train_indexes', 'data_fn', 'decoder', 'loss_fn', 'metric_class', 'target_metric_val'])
 
-  @param model:
-  @param datas: The game of life board states
-  @param targets: The data for the network to predict.
-  @param decoder: The decoder to use to predict the game of life state.
-    This is used for adversarial or autoencoder training even when training on a different task.
-  @param decoder_task: The decoder to use for the task. Same as decoder if predicting life states.
-  @param discriminator:
-  @param task_loss_fn: The loss function to use for the task.
-  @param train_index: The index to calculate the loss of the model on the task.
-    If it's -1, it won't do task training, only adversarial or autoencoder.
-  @param indexes_to_adver:
-  @param non_train_indexies: Indexes to calculate the metric on.
-  @param should_train_model: If false, it only trains the decoder.
-  @param metric_prefix:
-  @param task_metric: A metric that outputs a value greater than 0. Lower is better.
-  @param target_task_metric_val: The training stops once the metric is lower than this value.
-  @return: A function to use for training
-  """
+def get_train_model(task_infos, model, datas, discriminator, indexes_to_adver, non_train_indexies, should_train_model,
+                    adversarial_task_name, metric_stop_task_name, metric_prefix):
 
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
   reg_loss_metric = tf.keras.metrics.Mean()
   metrics = [
-    ["task_metric", task_metric],
     ["discrim_acc", discrim_acc_metric],
     ["gen_acc", gen_acc_metric],
     ["reg loss", reg_loss_metric],
   ]
-  acc_metrics = [tf.keras.metrics.BinaryAccuracy() for _ in range(FLAGS.num_timesteps+1)]
-  for i in range(FLAGS.num_timesteps+1):
-    metrics.append(["acc at {}".format(i), acc_metrics[i]])
 
-  # Create other task metrics for other timesteps with the same class as task_metric
-  all_task_metrics = [type(task_metric)() for _ in range(FLAGS.num_timesteps+1)]
-  for i in range(FLAGS.num_timesteps+1):
-    metrics.append(["task metric at {}".format(i), all_task_metrics[i]])
+  trainable_weights = []
+  if should_train_model:
+    trainable_weights += model.trainable_weights
+
+  total_train_timesteps = len(indexes_to_adver)
+  for task_info in task_infos:
+    task_info['metrics'] = [task_info['metric_class']() for _ in range(FLAGS.num_timesteps+1)]
+    for i in range(FLAGS.num_timesteps + 1):
+      metrics.append(["{}_metric_at_{}".format(task_info['name'], i), task_info['metrics'][i]])
+
+    total_train_timesteps += len(task_info['train_indexes'])
+
+    trainable_weights.append(task_info['decoder'].trainable_weights)
+
+    if "metric_stop_task_name" == task_info["name"]:
+      metric_stop_task = task_info
+
+  print("metrics", metrics)
 
   lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
                                                                decay_steps=100000,
@@ -87,53 +83,35 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
     return total_loss
 
   @tf.function
-  def train_step(batch, batch_targets, adver_batch):
+  def train_step(batch, adver_batch):
     inputs_batch = batch[:, 0]
-    outputs_batch = batch
     with tf.GradientTape() as tape, tf.GradientTape() as disc_tape:
       generator_loss = 0.0
       discriminator_loss = 0.0
       ran_discrim = False
       model_outputs = model(inputs_batch)
+      loss = 0
 
-      reg_loss = sum(model.losses) + sum(decoder.losses)
-      reg_loss_metric.update_state([reg_loss])
-      loss = reg_loss * FLAGS.reg_amount
-
+      # TODO: Implement regularization
       for i in range(FLAGS.num_timesteps+1):
-        pred = decoder(model_outputs[i])
-        acc_metrics[i].update_state(outputs_batch[:, i], pred)
+        for task_info in task_infos:
+          batch_targets = task_info['data_fn'](batch)
 
-        if (i == 0) and FLAGS.use_autoencoder:
-          loss += loss_fn(outputs_batch[:, i], pred)
-          if train_index == -1:
-            task_metric.update_state(outputs_batch[:, i], pred)
+          pred = task_info['decoder'](model_outputs[i])
+          task_info['metrics'][i].update_state(batch_targets[:, i], pred)
+          if i in task_info['train_indexes']:
+            loss += loss_fn(batch_targets[:, i], pred)
 
-        if train_index > -1:
-          task_pred = decoder_task(model_outputs[i])
-          all_task_metrics[i].update_state(batch_targets[:, i], task_pred)
-          if i == train_index or ((i == 0) and FLAGS.use_task_autoencoder):
-            loss += task_loss_fn(batch_targets[:, i], task_pred)
-            if i > 0:
-              task_metric.update_state(batch_targets[:, i], task_pred)
+          if (task_info["name"] == adversarial_task_name) and (i in indexes_to_adver):
+            discrim_on_pred = discriminator(tf.math.sigmoid(pred))
+            discrim_on_real = discriminator(adver_batch[:,0])
+            discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
+            generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
+            gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
+            loss += generator_loss
+            ran_discrim = True
 
-        if i in indexes_to_adver:
-          discrim_on_pred = discriminator(tf.math.sigmoid(pred))
-          discrim_on_real = discriminator(adver_batch[:,0])
-          discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
-          generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
-          gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
-          loss += generator_loss
-          ran_discrim = True
-
-      loss /= (1+FLAGS.use_autoencoder)
-
-    trainable_weights = []
-    trainable_weights += decoder.trainable_weights
-    if decoder != decoder_task:
-      trainable_weights += decoder_task.trainable_weights
-    if should_train_model:
-      trainable_weights += model.trainable_weights
+      loss /= total_train_timesteps
 
     grads = tape.gradient(loss, trainable_weights)
     clip_val = .1
@@ -152,8 +130,8 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
       metric.reset_states()
 
     for step_i in range(FLAGS.max_train_steps):
-      batch, batch_targets = get_batch(datas, targets, FLAGS.batch_size)
-      adver_batch, _ = get_batch(datas, targets, FLAGS.batch_size)
+      batch, batch_targets = get_batch(datas, FLAGS.batch_size)
+      adver_batch, _ = get_batch(datas, FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(batch_targets), tf.constant(adver_batch))
       if step_i % FLAGS.eval_interval == 0:
@@ -162,17 +140,13 @@ def get_train_model(model, datas, targets, decoder, decoder_task, discriminator,
             print(step_i, name, metric.result().numpy())
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
-          model_results = model(eval_datas[:, 0])
-          gen_boards = get_gens(decoder, model_results, True)
-          print("eval_datas", eval_datas.shape, "gen_boards", gen_boards.shape, "non_train_indexies", non_train_indexies)
-          visualize_metric_result = train.visualize_metric.visualize_metric(eval_datas, gen_boards, .95, non_train_indexies)
-          print("visualize_metric_result", visualize_metric_result)
-          tf.summary.scalar(metric_prefix + "/" + "visualize_metric_result", visualize_metric_result, step=step_i)
+        # TODO: Implement visualize metric
 
         writer.flush()
 
         print("=" * 100, flush=True)
-        if task_metric.result().numpy() < target_task_metric_val and step_i > 0:
+        metric_index = metric_stop_task['train_indexes'][-1]
+        if metric_stop_task['metrics'][metric_index].result().numpy() < metric_stop_task['target_metric_val'] and step_i > 0:
           return
 
         for name, metric in metrics:
@@ -247,9 +221,19 @@ def main(_):
     decoder_task = decoder
     target_metric_val = FLAGS.target_pred_state_metric_val
 
+  # TaskInfo = namedtuple("TaskInfo",
+  #                       ['name', 'train_indexes', 'data_fn', 'decoder', 'loss_fn', 'metric_class', 'target_metric_val'])
+  #
+
+  task_infos = [
+    {'name': 'board', 'train_indexes': [0], 'data_fn': lambda x: x, 'decoder': decoder,
+      'loss_fn': loss_fn, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val},
+    {'name': 'count', 'train_indexes': [0, FLAGS.num_timesteps - 1], 'data_fn': num_black_cells, 'decoder': decoder_counter,
+     'loss_fn': mse_loss, 'metric_class': tf.keras.metrics.MeanSquaredError, 'target_metric_val': FLAGS.target_pred_state_metric_val}
+  ]
+
   print("Full model training")
-  get_train_model(model, datas, targets, decoder, decoder_task, discriminator, task_loss_fn,
-                      FLAGS.num_timesteps, [], non_train_indexies, True, "train_full_model", task_metric, target_metric_val)()
+  get_train_model(task_infos, model, datas, discriminator, [], non_train_indexies, True, None, 'board', 'full_model')()
 
   if task_metric.result().numpy() > FLAGS.target_task_metric_val:
     save_metric_result(-task_metric.result().numpy(), "final_metric_result")
