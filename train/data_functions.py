@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.signal import convolve2d
 from absl import flags
+import tensorflow as tf
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('board_size', 20, '')
@@ -12,7 +13,8 @@ def life_step(X):
 
 
 def num_black_cells(X):
-    return np.sum(X, axis=(-1, -2, -3))
+  val = tf.expand_dims(tf.reduce_sum(X, axis=(-1, -2, -3)), 2)
+  return val
 
 
 def convert_model_in(data):
