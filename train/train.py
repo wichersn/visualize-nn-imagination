@@ -51,16 +51,11 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     for i in range(FLAGS.num_timesteps + 1):
       metrics.append(["{}_metric_at_{}".format(task_info['name'], i), task_info['metrics'][i]])
 
-    if metric_stop_task_name == task_info["name"]:
-      metric_stop_task = task_info
-
   lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
                                                                decay_steps=100000,
                                                                decay_rate=FLAGS.lr_decay_rate_per1M_steps)
   optimizer = tf.keras.optimizers.Adam(lr_schedule)
   discriminator_opt = tf.keras.optimizers.Adam()
-
-  print("metric_stop_task", metric_stop_task['name'])
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
     real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
@@ -114,9 +109,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
     print("trainable_weights", trainable_weights, flush=True)
 
-    print("loss", loss)
     grads = tape.gradient(loss, trainable_weights)
-    print("grads", grads)
     clip_val = .1
     grads = [(tf.clip_by_value(grad, -clip_val, clip_val)) for grad in grads]
     optimizer.apply_gradients(zip(grads, trainable_weights))
@@ -147,10 +140,11 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
         writer.flush()
 
-        print("=" * 100, flush=True)
-        metric_index = metric_stop_task['train_indexes'][-1]
-        if metric_stop_task['metrics'][metric_index].result().numpy() < metric_stop_task['target_metric_val'] and step_i > 0:
+        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
+        if task_good_enough and step_i > 0:
           return
+        if step_i >= FLAGS.max_train_steps - 3:
+          return  # So the metric values don't get reset when there's only a few timesteps left.
 
         for name, metric in metrics:
           metric.reset_states()
@@ -160,6 +154,16 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 def np_sig(x):
   return 1/(1 + np.exp(-x)) 
 
+def is_task_good_enough(task_infos, metric_stop_task_name):
+  for task_info in task_infos:
+    if metric_stop_task_name == task_info["name"]:
+      metric_stop_task = task_info
+
+  metric_index = metric_stop_task['train_indexes'][-1]
+  stop_metric = metric_stop_task['metrics'][metric_index]
+
+  metric_result = stop_metric.result().numpy()
+  return metric_result < metric_stop_task['target_metric_val'], metric_result
 
 def get_gens(decoder, model_results, is_img):
   gen_boards = []
@@ -233,24 +237,19 @@ def main(_):
   get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=True,
                     adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
 
-  # if task_metric.result().numpy() > FLAGS.target_task_metric_val:
-  #   save_metric_result(-task_metric.result().numpy(), "final_metric_result")
-  #   return
-  #
-  # if FLAGS.count_cells:
-  #   train_index = -1  # This makes it only train autoencoder and adversarial, not task loss.
-  # else:
-  #   train_index = FLAGS.num_timesteps
-  #
-  # # The decoder only and adverarial training uses the pred_state metric cause it's not doing any task specific training.
-  # print("Training Only Decoder", flush=True)
-  # get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-  #                     train_index, [], non_train_indexies, False, "train_decoder", pred_state_metric, FLAGS.target_pred_state_metric_val+.05)()
-  #
-  # print("Training Only Decoder Adversarial")
-  # get_train_model(model, datas, targets, adver_decoder, adver_decoder, discriminator, task_loss_fn,
-  #                     train_index, non_train_indexies, non_train_indexies, False, "train_decoder_adversarial", pred_state_metric, FLAGS.target_pred_state_metric_val+.01)()
-  #
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
+  if not task_good_enough:
+    save_metric_result(-task_metric_result, "final_metric_result")
+    return
+
+  print("Training Only Decoder", flush=True)
+  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
+                    adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='train_decoder')()
+
+  print("Training Only Decoder Adversarial")
+  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
+                    adversarial_task_name='board', metric_stop_task_name=metric_stop_task_name, metric_prefix='train_decoder_adversarial')()
+
   # model_results = model(eval_datas[:, 0])
   # gen_boards = get_gens(decoder, model_results, True)
   # adver_gen_boards = get_gens(adver_decoder, model_results, True)
