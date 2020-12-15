@@ -30,12 +30,6 @@ flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
-# class TaskInfo:
-#   def __init__(self, name, train_indexes, data_fn, decoder, loss_fn, metric_class, target_metric_val):
-#     self.name, train_indexes, data_fn, decoder, loss_fn, metric_class, target_metric_val
-
-TaskInfo = namedtuple("TaskInfo", ['name', 'train_indexes', 'data_fn', 'decoder', 'loss_fn', 'metric_class', 'target_metric_val'])
-
 def get_train_model(task_infos, model, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix):
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
