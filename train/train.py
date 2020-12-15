@@ -31,6 +31,24 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix):
+  """This training function was designed to be flexible to work with a variety of tasks.
+
+  @ param task_infos: A list of dicts. Each dict specifies the parameters of a task. Keys:
+    name, train_indexes: The indexes train the task on,
+    data_fn: A function called on each batch to convert it to the format to train the task,
+    decoder, loss_fn: Loss to use between the decoder predictions and data,
+    metric_class: Metrics for each timepstep are created using this class,
+    target_metric_val: Training will stop when the metric gets below this value.
+  @param model:
+  @param datas: The game of life board states
+  @param discriminator:
+  @param should_train_model: If false, it only trains the decoder.
+  @param adversarial_task_name: The task with the decoder to train adversarially.
+  @param metric_stop_task_name: The task with the metric to decide when to stop training.
+  @param metric_prefix:
+  @return: A function to use for training
+  """
+
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
   reg_loss_metric = tf.keras.metrics.Mean()
