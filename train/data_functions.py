@@ -14,7 +14,7 @@ def life_step(X):
 
 def num_black_cells(X):
   val = tf.expand_dims(tf.reduce_sum(X, axis=(-1, -2, -3)), 2)
-  return val
+  return val / (FLAGS.board_size ** 2)
 
 
 def convert_model_in(data):
