@@ -7,7 +7,6 @@ import os
 import train.visualize_metric
 from train.data_functions import num_black_cells, gen_data_batch, get_batch
 from train.model_functions import create_models
-from collections import namedtuple
 
 
 FLAGS = flags.FLAGS
@@ -22,7 +21,7 @@ flags.DEFINE_float('target_task_metric_val', .01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
-flags.DEFINE_float('learning_rate', .00001, '')
+flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.01, '')
 
@@ -75,11 +74,12 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
           pred = task_info['decoder'](model_outputs[i])
 
-          # tf.print("batch_targets", batch_targets, "pred", pred)
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
-            loss += loss_fn(batch_targets, pred)
-            print("Training i", i, task_info['name'])
+            # tf.print("batch_targets", batch_targets, "pred", pred)
+            loss += task_info['loss_fn'](batch_targets, pred)
+            # tf.print("Training i", i, task_info['name'])
+            # tf.print("loss", loss)
 
           elif task_info["name"] == adversarial_task_name:
             discrim_on_pred = discriminator(tf.math.sigmoid(pred))
@@ -103,12 +103,12 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     for task_info in task_infos:
       trainable_weights += task_info['decoder'].trainable_weights
 
-    print("trainable_weights", trainable_weights, flush=True)
-
     grads = tape.gradient(loss, trainable_weights)
+    grads_weights = list(zip(grads, trainable_weights))
     clip_val = .1
-    grads = [(tf.clip_by_value(grad, -clip_val, clip_val)) for grad in grads]
-    optimizer.apply_gradients(zip(grads, trainable_weights))
+    grads_weights = [grad_weight for grad_weight in grads_weights if grad_weight[0] != None]
+    grads_weights = [(tf.clip_by_value(grad, -clip_val, clip_val), weight) for grad, weight in grads_weights]
+    optimizer.apply_gradients(grads_weights)
 
     if ran_discrim:
       disctim_grads = disc_tape.gradient(discriminator_loss, discriminator.trainable_weights)
@@ -131,8 +131,6 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
           for name, metric in metrics:
             print(step_i, name, metric.result().numpy())
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
-
-        # TODO: Implement visualize metric
 
         writer.flush()
 
