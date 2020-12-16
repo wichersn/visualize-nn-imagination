@@ -217,7 +217,7 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
 
 class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
   def convert_y(self, y):
-    return tf.math.round(y * (FLAGS.board_size ** 2))
+    return tf.math.round(y)
 
   def update_state(self, y_true, y_pred, sample_weight=None):
     y_true = self.convert_y(y_true)
