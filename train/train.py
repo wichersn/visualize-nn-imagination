@@ -215,6 +215,20 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
     return 1 - super().result()
 
+class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
+  def convert_y(self, y):
+    return tf.math.round(y * (FLAGS.board_size ** 2))
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true = self.convert_y(y_true)
+    y_pred = self.convert_y(y_pred)
+
+    return super().update_state(y_true, y_pred, sample_weight)
+
+  def result(self):
+    return 1 - super().result()
+
+
 def save_np(data, name):
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
     np.save(file, data)
@@ -246,7 +260,7 @@ def main(_):
   if FLAGS.count_cells:
     task_infos.append(
       {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': tf.keras.metrics.MeanSquaredError, 'target_metric_val': FLAGS.target_task_metric_val})
+      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val})
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
