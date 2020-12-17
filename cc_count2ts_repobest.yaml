@@ -17,12 +17,6 @@ trainingInput:
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: target_task_metric_val
-        type: DOUBLE
-        minValue: 0.00002
-        maxValue: 0.00002
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: num_timesteps
         type: INTEGER
         minValue: 2
