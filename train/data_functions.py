@@ -58,6 +58,9 @@ def plt_boards(boards):
     plt.axis('off')
   plt.show()
 
-def get_batch(datas, batch_size):
-    idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    return datas[idx]
+def get_batch(datas, batch_size, curiculum_progress=1):
+  """curiculum_progress should be from 0 to 1, percent of tasks to train on sorted by difficulty"""
+  #Sort data by number of alive cells in the input state
+  sorted_idx = np.argsort(num_black_cells(datas)[:,0,0])
+  idx = np.random.choice(sorted_idx[:int(len(datas) * curiculum_progress)], batch_size, replace=False)
+  return datas[idx]

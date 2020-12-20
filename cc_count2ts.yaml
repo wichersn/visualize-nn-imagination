@@ -107,6 +107,12 @@ trainingInput:
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: use_curiculum
+        type: INTEGER
+        minValue: 1
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: eval_interval
         type: INTEGER
         minValue: 5000

@@ -10,12 +10,14 @@ from train.model_functions import create_models
 
 
 FLAGS = flags.FLAGS
+
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
+flags.DEFINE_integer('use_curiculum', 0, '')
 
 flags.DEFINE_float('target_task_metric_val', .01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
@@ -139,8 +141,11 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     for name, metric in metrics:
       metric.reset_states()
 
+    curiculum_progress = 0.1
     for step_i in range(FLAGS.max_train_steps):
-      batch = get_batch(datas, FLAGS.batch_size)
+      if not FLAGS.use_curiculum:
+        curiculum_progress = 1
+      batch = get_batch(datas, FLAGS.batch_size, curiculum_progress)
       adver_batch = get_batch(datas, FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
@@ -153,12 +158,17 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
         writer.flush()
 
         task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
-        if task_good_enough and step_i > 0:
+        if task_good_enough and step_i > 0 and curiculum_progress >= 1:
           print("STOP good enough", flush=True)
           return
-        if step_i >= FLAGS.max_train_steps - 3:
+        if step_i >= FLAGS.max_train_steps - 3 and curiculum_progress >= 1:
           print("STOP close to end", flush=True)
           return  # So the metric values don't get reset when there's only a few timesteps left.
+
+        if task_good_enough and curiculum_progress < 1:
+          print("Finished curiculum level", curiculum_progress)
+          curiculum_progress += 0.1
+          curiculum_progress = min(curiculum_progress, 1)
 
         for name, metric in metrics:
           metric.reset_states()
