@@ -17,7 +17,7 @@ flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
-flags.DEFINE_float('target_task_metric_val', .01, '')
+flags.DEFINE_float('target_task_metric_val', 0.01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
@@ -100,7 +100,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
             # tf.print("loss", loss)
 
           elif task_info["name"] == adversarial_task_name:
-            discrim_on_pred = discriminator(tf.math.sigmoid(pred))
+            discrim_on_pred = discriminator(pred)
             discrim_on_real = discriminator(adver_batch[:,0])
             discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
             generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
@@ -165,9 +165,6 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     print("STOP end of loop", flush=True)
   return train_full
 
-def np_sig(x):
-  return 1/(1 + np.exp(-x)) 
-
 def is_task_good_enough(task_infos, metric_stop_task_name):
   for task_info in task_infos:
     if metric_stop_task_name == task_info["name"]:
@@ -188,7 +185,7 @@ def get_gens(decoder, model_results, is_img):
   gen_boards = np.array(gen_boards)
 
   if is_img:
-    gen_boards = np_sig(gen_boards)
+    gen_boards = np.clip(gen_boards, 0.0, 1.0)
     gen_boards = np.transpose(gen_boards, (1,0,2,3,4))
   else:
     gen_boards = np.transpose(gen_boards, (1, 0, 2))
@@ -214,6 +211,20 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_ind
 class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
     return 1 - super().result()
+
+class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
+  def convert_y(self, y):
+    return tf.math.round(y * (FLAGS.board_size ** 2))
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true = self.convert_y(y_true)
+    y_pred = self.convert_y(y_pred)
+
+    return super().update_state(y_true, y_pred, sample_weight)
+
+  def result(self):
+    return 1 - super().result()
+
 
 def save_np(data, name):
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
@@ -242,11 +253,11 @@ def main(_):
 
   task_infos = [
     {'name': 'board', 'train_indexes': board_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
-      'loss_fn': loss_fn, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val}]
+      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val}]
   if FLAGS.count_cells:
     task_infos.append(
       {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': tf.keras.metrics.MeanSquaredError, 'target_metric_val': FLAGS.target_task_metric_val})
+      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val})
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
