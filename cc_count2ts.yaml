@@ -49,7 +49,7 @@ trainingInput:
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 4
+        minValue: 2
         maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
@@ -97,8 +97,14 @@ trainingInput:
 
       - parameterName: reg_amount
         type: DOUBLE
+        minValue: 0.0000001
+        maxValue: 0.1
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: dropout_rate
+        type: DOUBLE
         minValue: 0.0
-        maxValue: 0.0
+        maxValue: 0.5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: use_residual
@@ -115,6 +121,6 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 2000000
-        maxValue: 2000000
+        minValue: 700000
+        maxValue: 700000
         scaleType: UNIT_LINEAR_SCALE
