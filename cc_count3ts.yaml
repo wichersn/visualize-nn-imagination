@@ -1,0 +1,126 @@
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: n1-standard-4
+  masterConfig:
+    acceleratorConfig:
+      count: 1
+      type: NVIDIA_TESLA_P100
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: final_metric_result
+    maxTrials: 20
+    maxParallelTrials: 5
+    params:
+      - parameterName: count_cells
+        type: INTEGER
+        minValue: 1
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: num_timesteps
+        type: INTEGER
+        minValue: 3
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+        
+      - parameterName: board_size
+        type: INTEGER
+        minValue: 10
+        maxValue: 10
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: use_task_autoencoder
+        type: INTEGER
+        minValue: 1
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: random_board_prob
+        type: DOUBLE
+        minValue: 1.0
+        maxValue: 1.0
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: encoder_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: timestep_layers
+        type: INTEGER
+        minValue: 4
+        maxValue: 6
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_counter_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_counter_strides
+        type: INTEGER
+        minValue: 2
+        maxValue: 2
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: encoded_size
+        type: INTEGER
+        minValue: 2
+        maxValue: 30
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: batch_size
+        type: INTEGER
+        minValue: 128
+        maxValue: 256
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: learning_rate
+        type: DOUBLE
+        minValue: 0.0001
+        maxValue: 0.001
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: lr_decay_rate_per1M_steps
+        type: DOUBLE
+        minValue: .1
+        maxValue: .7
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: reg_amount
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.0
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: use_residual
+        type: INTEGER
+        minValue: 1
+        maxValue: 1
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: eval_interval
+        type: INTEGER
+        minValue: 5000
+        maxValue: 5000
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: max_train_steps
+        type: INTEGER
+        minValue: 1000000
+        maxValue: 1000000
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: early_task_metric_val
+        type: DOUBLE
+        minValue: 0.9
+        maxValue: 0.9
+        scaleType: UNIT_LINEAR_SCALE
