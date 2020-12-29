@@ -3,7 +3,7 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_timesteps', 3, '')
-flags.DEFINE_integer('encoded_size', 8, '')
+flags.DEFINE_integer('encoded_size', 7, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
@@ -23,13 +23,6 @@ def create_timestep_model(name=''):
     timestep_model.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("timestep_model", timestep_model.layers)
   return timestep_model
-
-def add_decoder_layers(decoder, decoder_layers, encoded_size=None):
-  if not encoded_size:
-    encoded_size = FLAGS.encoded_size
-  for _ in range(decoder_layers-1):
-    decoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-    decoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
 
 def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   decoder = tf.keras.Sequential(
@@ -68,7 +61,8 @@ def create_models():
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
+  decoder_counter.add(
+    tf.keras.layers.Conv2D(FLAGS.encoded_size//2, 1, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
   print("decoder_counter", decoder_counter.layers)

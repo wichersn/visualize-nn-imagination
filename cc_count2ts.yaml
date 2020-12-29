@@ -53,24 +53,6 @@ trainingInput:
         maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: decoder_layers
-        type: INTEGER
-        minValue: 1
-        maxValue: 2
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_counter_layers
-        type: INTEGER
-        minValue: 2
-        maxValue: 4
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_counter_strides
-        type: INTEGER
-        minValue: 2
-        maxValue: 2
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: encoded_size
         type: INTEGER
         minValue: 2
@@ -97,9 +79,9 @@ trainingInput:
 
       - parameterName: reg_amount
         type: DOUBLE
-        minValue: 0.00000001
-        maxValue: 0.0001
-        scaleType: UNIT_LOG_SCALE
+        minValue: 0.0
+        maxValue: 0.0
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: dropout_rate
         type: DOUBLE
