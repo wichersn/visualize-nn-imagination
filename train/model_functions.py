@@ -37,9 +37,8 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
       tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
     ], name=name
   )
-  add_decoder_layers(decoder, decoder_layers, encoded_size)
   decoder.add(
-    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+    tf.keras.layers.Conv2D(1, 1, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print(name, decoder.layers)
   return decoder
 
@@ -48,9 +47,7 @@ def create_models():
   input_layer = tf.keras.Input(shape=input_shape)
 
   encoder = tf.keras.Sequential(name="encoder")
-  for _ in range(FLAGS.encoder_layers):
-    encoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
-    encoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
+  encoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 1, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
   print("encoder", encoder.layers)
 
   intermediates = [encoder(input_layer)]
@@ -67,8 +64,7 @@ def create_models():
     intermediates.append(timestep)
 
   decoder = tf.keras.Sequential(name="decoder")
-  add_decoder_layers(decoder, FLAGS.decoder_layers)
-  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  decoder.add(tf.keras.layers.Conv2D(1, 1, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")

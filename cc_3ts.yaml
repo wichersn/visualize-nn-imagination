@@ -23,22 +23,10 @@ trainingInput:
         maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: encoder_layers
-        type: INTEGER
-        minValue: 1
-        maxValue: 2
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: timestep_layers
         type: INTEGER
         minValue: 3
         maxValue: 8
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_layers
-        type: INTEGER
-        minValue: 1
-        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoded_size
