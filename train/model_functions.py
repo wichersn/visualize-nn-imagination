@@ -4,6 +4,8 @@ from absl import flags
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 8, '')
+flags.DEFINE_integer('attention_num_heads', 2, '')
+flags.DEFINE_integer('attention_key_dim', 2, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
@@ -39,36 +41,32 @@ def reshape_atten_val(val):
   return tf.reshape(val, [val.shape[0]*val.shape[1]*val.shape[2], val.shape[3]*val.shape[4], val.shape[5]])
 
 class VisionSelfAttention(tf.keras.layers.Layer):
-  def __init__(self, num_heads, key_dim, kernel_size=3):
+  def __init__(self, num_heads, key_dim, output_shape, kernel_size=3):
     super(VisionSelfAttention, self).__init__()
     self.kernel_size = kernel_size
-    self.atten_layer = tf.keras.layers.MultiHeadAttention(num_heads, key_dim)
+    self.atten_layer = tf.keras.layers.MultiHeadAttention(num_heads, key_dim, output_shape=output_shape)
 
   def call(self, x):
-    print("printing in call fn")
-    tf.print("tf prinintg in call")
     x = tf.reshape(x, [FLAGS.batch_size]+x.shape[1:])
+
     patches = get_patches(x, self.kernel_size)
-
     dists = get_dists(patches.shape)
-
     key_val_input = tf.concat([patches, dists], -1)
+    key_val_input = reshape_atten_val(key_val_input)
 
     queries = x
     queries = tf.reshape(queries, [queries.shape[0] * queries.shape[1] * queries.shape[2], 1, queries.shape[3]])
 
-    key_val_input_reshape = reshape_atten_val(key_val_input)
-
-    atten_out = self.atten_layer(queries, key_val_input_reshape, key_val_input_reshape)
-
+    atten_out = self.atten_layer(queries, key_val_input, key_val_input)
     atten_out = tf.reshape(atten_out, x.shape[:-1] + [atten_out.shape[-1]])
+    relu here
 
     return atten_out
 
 def create_timestep_model(name=''):
   timestep_model = tf.keras.Sequential(name="timestep_model"+name)
   for _ in range(FLAGS.timestep_layers):
-    timestep_model.add(VisionSelfAttention(4,4))
+    timestep_model.add(VisionSelfAttention(FLAGS.attention_num_heads, FLAGS.attention_key_dim, FLAGS.encoded_size))
     timestep_model.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("timestep_model", timestep_model.layers)
   return timestep_model
@@ -77,7 +75,7 @@ def add_decoder_layers(decoder, decoder_layers, encoded_size=None):
   if not encoded_size:
     encoded_size = FLAGS.encoded_size
   for _ in range(decoder_layers-1):
-    decoder.add(VisionSelfAttention(4,4))
+    decoder.add(VisionSelfAttention(FLAGS.attention_num_heads, FLAGS.attention_key_dim, encoded_size))
     decoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
 
 def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
@@ -87,7 +85,7 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
     ], name=name
   )
   add_decoder_layers(decoder, decoder_layers, encoded_size)
-  decoder.add(VisionSelfAttention(4,4))
+  decoder.add(VisionSelfAttention(FLAGS.attention_num_heads, FLAGS.attention_key_dim, encoded_size))
   print(name, decoder.layers)
   return decoder
 
@@ -97,7 +95,7 @@ def create_models():
 
   encoder = tf.keras.Sequential(name="encoder")
   for _ in range(FLAGS.encoder_layers):
-    encoder.add(VisionSelfAttention(4,4))
+    encoder.add(VisionSelfAttention(FLAGS.attention_num_heads, FLAGS.attention_key_dim, FLAGS.encoded_size))
     encoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("encoder", encoder.layers)
 
@@ -116,7 +114,7 @@ def create_models():
 
   decoder = tf.keras.Sequential(name="decoder")
   add_decoder_layers(decoder, FLAGS.decoder_layers)
-  decoder.add(VisionSelfAttention(4,4))
+  decoder.add(VisionSelfAttention(FLAGS.attention_num_heads, FLAGS.attention_key_dim, 1))
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")

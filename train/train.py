@@ -88,12 +88,14 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       ran_discrim = False
       model_outputs = model(inputs_batch)
       loss = 0
+      print("model_outputs", model_outputs)
 
       for i in range(FLAGS.num_timesteps+1):
         for task_info in task_infos:
           batch_targets = task_info['data_fn'](batch)[:, i]
 
           pred = task_info['decoder'](model_outputs[i])
+          print("pred", pred)
 
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
@@ -137,26 +139,27 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     for name, metric in metrics:
       metric.reset_states()
 
-    for step_i in range(max_train_steps):
-      batch = get_batch(datas, FLAGS.batch_size)
-      adver_batch = get_batch(datas, FLAGS.batch_size)
+    with tf.profiler.experimental.Profile(FLAGS.job_dir):
+      for step_i in range(max_train_steps):
+        batch = get_batch(datas, FLAGS.batch_size)
+        adver_batch = get_batch(datas, FLAGS.batch_size)
 
-      train_step(tf.constant(batch), tf.constant(adver_batch))
-      if step_i % FLAGS.eval_interval == 0:
-        with writer.as_default():
+        train_step(tf.constant(batch), tf.constant(adver_batch))
+        if step_i % FLAGS.eval_interval == 0:
+          with writer.as_default():
+            for name, metric in metrics:
+              tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
+
+          writer.flush()
+
+          task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
+          if task_good_enough and step_i > 0:
+            return
+          if step_i >= max_train_steps - 3:
+            return  # So the metric values don't get reset when there's only a few timesteps left.
+
           for name, metric in metrics:
-            tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
-
-        writer.flush()
-
-        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
-        if task_good_enough and step_i > 0:
-          return
-        if step_i >= max_train_steps - 3:
-          return  # So the metric values don't get reset when there's only a few timesteps left.
-
-        for name, metric in metrics:
-          metric.reset_states()
+            metric.reset_states()
   return train_full
 
 def is_task_good_enough(task_infos, metric_stop_task_name):
@@ -292,21 +295,21 @@ def main(_):
     save_np(task_gen, "task_gen")
 
 
-  def fine_tune_new_decoder(train_indexes, name):
-    print("Train decoder {}".format(name))
-    task_infos[0]["train_indexes"] = train_indexes
-    task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
-    print("task infos", task_infos)
-    get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=False,
-                      adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
-                    max_train_steps=int(FLAGS.max_train_steps/10))()
-    new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
-    save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
-
-  fine_tune_new_decoder({0, FLAGS.num_timesteps}, "first_last")
-  fine_tune_new_decoder(set(range(FLAGS.num_timesteps+1)), "all")
-  for dec_ts in range(FLAGS.num_timesteps + 1):
-    fine_tune_new_decoder({dec_ts}, dec_ts)
+  # def fine_tune_new_decoder(train_indexes, name):
+  #   print("Train decoder {}".format(name))
+  #   task_infos[0]["train_indexes"] = train_indexes
+  #   task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
+  #   print("task infos", task_infos)
+  #   get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=False,
+  #                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+  #                   max_train_steps=int(FLAGS.max_train_steps/10))()
+  #   new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
+  #   save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
+  #
+  # fine_tune_new_decoder({0, FLAGS.num_timesteps}, "first_last")
+  # fine_tune_new_decoder(set(range(FLAGS.num_timesteps+1)), "all")
+  # for dec_ts in range(FLAGS.num_timesteps + 1):
+  #   fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)

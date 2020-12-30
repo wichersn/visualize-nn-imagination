@@ -22,7 +22,7 @@ gcloud ai-platform jobs submit training $JOB_NAME \
   --module-name train.train \
   --region asia-east1	\
   --python-version 3.7 \
-  --runtime-version 2.2 \
+  --runtime-version 2.3 \
   --job-dir $JOB_DIR \
   --config $1 \
 
