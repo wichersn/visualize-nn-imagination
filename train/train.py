@@ -19,8 +19,8 @@ flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
 flags.DEFINE_float('target_task_metric_val', 0.01, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
-flags.DEFINE_float('early_task_metric_val', 0.60, '')
-flags.DEFINE_float('early_pred_state_metric_val', .60, '')
+flags.DEFINE_float('early_task_metric_val', 1.0, '')
+flags.DEFINE_float('early_pred_state_metric_val', 1.0, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
