@@ -21,6 +21,8 @@ flags.DEFINE_float('target_task_metric_val', 0.001, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
+flags.DEFINE_integer('training_data_amount', 200000, '')
+flags.DEFINE_integer('start_curiculum_board_size', 4, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.01, '')
@@ -30,7 +32,7 @@ flags.DEFINE_string('job_dir', '',
 flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, datas, discriminator, should_train_model,
-                    adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
+                    adversarial_task_name, metric_stop_task_name, metric_prefix, start_curiculum_board_size, max_train_steps=None):
   """This training function was designed to be flexible to work with a variety of tasks.
 
   @ param task_infos: A list of dicts. Each dict specifies the parameters of a task. Keys:
@@ -92,7 +94,6 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       for i in range(FLAGS.num_timesteps+1):
         for task_info in task_infos:
           batch_targets = task_info['data_fn'](batch)[:, i]
-
           pred = task_info['decoder'](model_outputs[i])
 
           task_info['metrics'][i].update_state(batch_targets, pred)
@@ -132,26 +133,35 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       discriminator_opt.apply_gradients(zip(disctim_grads, discriminator.trainable_weights))
     
   def train_full():
+    board_size = start_curiculum_board_size
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
 
     for name, metric in metrics:
       metric.reset_states()
 
     for step_i in range(max_train_steps):
-      batch = get_batch(datas, FLAGS.batch_size)
-      adver_batch = get_batch(datas, FLAGS.batch_size)
+      batch = get_batch(datas[board_size], FLAGS.batch_size)
+      adver_batch = get_batch(datas[board_size], FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
       if step_i % FLAGS.eval_interval == 0:
         with writer.as_default():
           for name, metric in metrics:
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
+            print(metric_prefix + "/" + name, metric.result())
 
+          tf.summary.scalar(metric_prefix + "/" + "board_size", board_size, step=step_i)
+          print("board_size", board_size)
         writer.flush()
 
-        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
+        task_good_enough, stop_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
+        print("stop_metric_result", stop_metric_result)
+        print("="*50)
         if task_good_enough and step_i > 0:
-          return
+          if board_size >= FLAGS.board_size:
+            return
+          else:
+            board_size += 1
         if step_i >= max_train_steps - 3:
           return  # So the metric values don't get reset when there's only a few timesteps left.
 
@@ -224,8 +234,12 @@ def save_np(data, name):
     np.save(file, data)
 
 def main(_):
-  datas = gen_data_batch(100000, FLAGS.num_timesteps)
-  eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
+  datas = {}
+  for board_size in range(FLAGS.start_curiculum_board_size, FLAGS.board_size+1):
+    datas[board_size] = gen_data_batch(FLAGS.training_data_amount, FLAGS.num_timesteps, board_size)
+    print("Gen data for", board_size)
+
+  eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps, FLAGS.board_size)
   encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
   board_train_indexes = set()
@@ -255,7 +269,8 @@ def main(_):
   print("task_infos", task_infos, flush=True)
   print("Full model training")
   get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=True,
-                    adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
+                  adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model',
+                  start_curiculum_board_size=FLAGS.start_curiculum_board_size)()
 
   task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
   if not task_good_enough:
@@ -267,11 +282,13 @@ def main(_):
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
+                  adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder',
+                  start_curiculum_board_size=FLAGS.board_size)()
 
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
+                  adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial',
+                  start_curiculum_board_size=FLAGS.board_size)()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gens(decoder, model_results, True)
@@ -299,7 +316,7 @@ def main(_):
     print("task infos", task_infos)
     get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=False,
                       adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
-                    max_train_steps=int(FLAGS.max_train_steps/10))()
+                    max_train_steps=int(FLAGS.max_train_steps/10), start_curiculum_board_size=FLAGS.board_size)()
     new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
     save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
 

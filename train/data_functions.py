@@ -24,22 +24,20 @@ def convert_model_in(data):
   return data
 
 
-def gen_data_batch(size, skip):
+def gen_data_batch(batch_size, timesteps, alive_cells_size):
   datas = []
-  start_next = None
-  for _ in range(size):
-    if np.random.rand(1) < FLAGS.random_board_prob or start_next is None:
-      life_state = np.random.rand(FLAGS.board_size, FLAGS.board_size) > .5
-    else:
-      life_state = start_next
+  alive_part = np.random.rand(batch_size, alive_cells_size, alive_cells_size) > .5
+  life_states = np.zeros([batch_size, FLAGS.board_size, FLAGS.board_size], dtype=np.int32)
+  life_states[:, :alive_cells_size, :alive_cells_size] = alive_part
+
+  for _ in range(batch_size):
+    life_state = life_states[0]
 
     data = []
     data.append(life_state)
-    for i in range(skip):
+    for i in range(timesteps):
       life_state = life_step(life_state)
       data.append(life_state)
-      if i == 0:
-        start_next = life_state
     datas.append(data)
 
   datas = convert_model_in(datas)
