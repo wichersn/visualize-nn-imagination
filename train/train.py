@@ -25,7 +25,7 @@ flags.DEFINE_integer('training_data_amount', 200000, '')
 flags.DEFINE_integer('start_curiculum_board_size', 4, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
-flags.DEFINE_float('reg_amount', 0.01, '')
+flags.DEFINE_float('reg_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')

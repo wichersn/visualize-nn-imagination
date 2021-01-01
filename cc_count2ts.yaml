@@ -25,14 +25,14 @@ trainingInput:
 
       - parameterName: start_curiculum_board_size
         type: INTEGER
-        minValue: 10
-        maxValue: 10
+        minValue: 4
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: board_size
         type: INTEGER
-        minValue: 10
-        maxValue: 10
+        minValue: 4
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: use_task_autoencoder
