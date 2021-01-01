@@ -49,20 +49,20 @@ trainingInput:
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 4
-        maxValue: 6
+        minValue: 2
+        maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
         type: INTEGER
         minValue: 1
-        maxValue: 3
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_strides
@@ -79,7 +79,7 @@ trainingInput:
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 200
+        minValue: 400
         maxValue: 512
         scaleType: UNIT_LINEAR_SCALE
 
@@ -91,11 +91,17 @@ trainingInput:
 
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
-        minValue: .4
-        maxValue: .7
+        minValue: .3
+        maxValue: .8
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.0
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: dropout_rate
         type: DOUBLE
         minValue: 0.0
         maxValue: 0.0
@@ -115,6 +121,6 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 2000000
-        maxValue: 2000000
+        minValue: 1000000
+        maxValue: 1000000
         scaleType: UNIT_LINEAR_SCALE
