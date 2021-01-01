@@ -97,9 +97,9 @@ trainingInput:
 
       - parameterName: reg_amount
         type: DOUBLE
-        minValue: 0.00000001
-        maxValue: 0.0001
-        scaleType: UNIT_LOG_SCALE
+        minValue: 0.0
+        maxValue: 0.0
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: dropout_rate
         type: DOUBLE

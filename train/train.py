@@ -23,7 +23,7 @@ flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
-flags.DEFINE_float('reg_amount', 0.01, '')
+flags.DEFINE_float('reg_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
