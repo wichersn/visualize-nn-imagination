@@ -2,6 +2,7 @@ import numpy as np
 from scipy.signal import convolve2d
 from absl import flags
 import tensorflow as tf
+import skimage.measure
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('board_size', 20, '')
@@ -13,8 +14,13 @@ def life_step(X):
 
 
 def num_black_cells(X):
+  # X is [batch_size, timesteps, board_size, board_size, 1] and val is [batch_size, timesteps, 1]
   val = tf.expand_dims(tf.reduce_sum(X, axis=(-1, -2, -3)), 2)
   return val / (FLAGS.board_size ** 2)
+
+def num_black_cells_in_patch(X):
+  targets = skimage.measure.block_reduce(X.numpy(), (1, 1, FLAGS.patch_size, FLAGS.patch_size, 1), np.mean) #CHECK DIMENSIONS
+  return targets.reshape(targets.shape[0], targets.shape[1], -1, targets.shape[3])
 
 
 def convert_model_in(data):
