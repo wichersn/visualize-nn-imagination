@@ -8,7 +8,7 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
-    maxTrials: 20
+    maxTrials: 5
     maxParallelTrials: 5
     params:
       - parameterName: count_cells
@@ -22,7 +22,13 @@ trainingInput:
         minValue: 2
         maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
-        
+
+      - parameterName: start_curiculum_board_size
+        type: INTEGER
+        minValue: 10
+        maxValue: 10
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: board_size
         type: INTEGER
         minValue: 10
@@ -93,12 +99,6 @@ trainingInput:
         type: DOUBLE
         minValue: .3
         maxValue: .8
-        scaleType: UNIT_LOG_SCALE
-
-      - parameterName: reg_amount
-        type: DOUBLE
-        minValue: 0.00000001
-        maxValue: 0.0001
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: dropout_rate

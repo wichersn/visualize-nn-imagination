@@ -5,7 +5,7 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.data_functions import num_black_cells, gen_data_batch, get_batch, plt_boards
 from train.model_functions import create_models, get_stop_grad_dec
 
 

@@ -30,12 +30,12 @@ def gen_data_batch(batch_size, timesteps, alive_cells_size):
   life_states = np.zeros([batch_size, FLAGS.board_size, FLAGS.board_size], dtype=np.int32)
   life_states[:, :alive_cells_size, :alive_cells_size] = alive_part
 
-  for _ in range(batch_size):
-    life_state = life_states[0]
+  for i in range(batch_size):
+    life_state = life_states[i]
 
     data = []
     data.append(life_state)
-    for i in range(timesteps):
+    for _ in range(timesteps):
       life_state = life_step(life_state)
       data.append(life_state)
     datas.append(data)
