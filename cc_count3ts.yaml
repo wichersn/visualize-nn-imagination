@@ -19,19 +19,19 @@ trainingInput:
 
       - parameterName: num_timesteps
         type: INTEGER
-        minValue: 2
-        maxValue: 2
+        minValue: 3
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
         
       - parameterName: board_size
         type: INTEGER
-        minValue: 4
-        maxValue: 4
+        minValue: 10
+        maxValue: 10
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: use_task_autoencoder
         type: INTEGER
-        minValue: 1
+        minValue: 0
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
@@ -73,26 +73,26 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 2
+        minValue: 4
         maxValue: 30
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 400
+        minValue: 300
         maxValue: 512
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: 0.0001
-        maxValue: 0.001
+        minValue: 0.001
+        maxValue: 0.1
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
-        minValue: .3
-        maxValue: .8
+        minValue: .1
+        maxValue: .7
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount
