@@ -236,7 +236,7 @@ def save_np(data, name):
     np.save(file, data)
 
 def main(_):
-  datas = gen_data_batch(100000, FLAGS.num_timesteps)
+  datas = gen_data_batch(200000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
