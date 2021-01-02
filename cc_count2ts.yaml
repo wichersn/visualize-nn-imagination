@@ -8,7 +8,7 @@ trainingInput:
   hyperparameters:
     goal: MAXIMIZE
     hyperparameterMetricTag: final_metric_result
-    maxTrials: 5
+    maxTrials: 20
     maxParallelTrials: 5
     params:
       - parameterName: count_cells

@@ -5,13 +5,13 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch, plt_boards
+from train.data_functions import num_black_cells, gen_data_batch, get_batch
 from train.model_functions import create_models, get_stop_grad_dec
 
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
-flags.DEFINE_integer('eval_interval', 1000, '')
+flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
@@ -19,6 +19,9 @@ flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
 flags.DEFINE_float('target_task_metric_val', 0.001, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
+flags.DEFINE_float('early_task_metric_val', 1.0, '')
+flags.DEFINE_float('early_pred_state_metric_val', 1.0, '')
+flags.DEFINE_integer('early_stop_step', 100000, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_integer('training_data_amount', 200000, '')
@@ -40,7 +43,8 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     data_fn: A function called on each batch to convert it to the format to train the task,
     decoder, loss_fn: Loss to use between the decoder predictions and data,
     metric_class: Metrics for each timepstep are created using this class,
-    target_metric_val: Training will stop when the metric gets below this value.
+    target_metric_val: Training will stop when the metric gets below this value,
+    early_metric_val: Training will stop if the metric is above this value after x steps
   @param model:
   @param datas: The game of life board states
   @param discriminator:
@@ -144,6 +148,13 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       adver_batch = get_batch(datas[board_size], FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
+
+      if step_i == FLAGS.early_stop_step and board_size == start_curiculum_board_size:
+        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
+        if not task_good_enough:
+          print("STOP not promising enough", flush=True)
+          return
+
       if step_i % FLAGS.eval_interval == 0:
         with writer.as_default():
           for name, metric in metrics:
@@ -154,9 +165,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
           print("board_size", board_size)
         writer.flush()
 
-        task_good_enough, stop_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
-        print("stop_metric_result", stop_metric_result)
-        print("="*50)
+        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
         if task_good_enough and step_i > 0:
           if board_size >= FLAGS.board_size:
             return
@@ -169,7 +178,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
           metric.reset_states()
   return train_full
 
-def is_task_good_enough(task_infos, metric_stop_task_name):
+def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
   for task_info in task_infos:
     if metric_stop_task_name == task_info["name"]:
       metric_stop_task = task_info
@@ -178,7 +187,8 @@ def is_task_good_enough(task_infos, metric_stop_task_name):
   stop_metric = metric_stop_task['metrics'][metric_index]
 
   metric_result = stop_metric.result().numpy()
-  return metric_result < metric_stop_task['target_metric_val'], metric_result
+  print("stop metric result", metric_result, target_val_name, metric_stop_task[target_val_name])
+  return metric_result < metric_stop_task[target_val_name], metric_result
 
 def get_gens(decoder, model_results, is_img):
   gen_boards = []
@@ -260,11 +270,13 @@ def main(_):
 
   task_infos = [
     {'name': 'board', 'train_indexes': board_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
-      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val}]
+      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
+     'early_metric_val': FLAGS.early_pred_state_metric_val}]
   if FLAGS.count_cells:
     task_infos.append(
       {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val})
+      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+       'early_metric_val': FLAGS.early_task_metric_val})
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
@@ -272,7 +284,7 @@ def main(_):
                   adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model',
                   start_curiculum_board_size=FLAGS.start_curiculum_board_size)()
 
-  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
