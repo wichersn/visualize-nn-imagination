@@ -85,8 +85,8 @@ trainingInput:
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: 0.001
-        maxValue: 0.1
+        minValue: 0.0001
+        maxValue: 0.01
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: lr_decay_rate_per1M_steps
@@ -95,28 +95,10 @@ trainingInput:
         maxValue: .7
         scaleType: UNIT_LOG_SCALE
 
-      - parameterName: reg_amount
-        type: DOUBLE
-        minValue: 0.0
-        maxValue: 0.0
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: dropout_rate
-        type: DOUBLE
-        minValue: 0.0
-        maxValue: 0.0
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: use_residual
         type: INTEGER
         minValue: 1
         maxValue: 1
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: eval_interval
-        type: INTEGER
-        minValue: 5000
-        maxValue: 5000
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: max_train_steps
@@ -127,6 +109,12 @@ trainingInput:
 
       - parameterName: early_task_metric_val
         type: DOUBLE
-        minValue: 0.9
-        maxValue: 0.9
+        minValue: 0.7
+        maxValue: 0.7
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: early_stop_step
+        type: INTEGER
+        minValue: 500000
+        maxValue: 500000
         scaleType: UNIT_LINEAR_SCALE

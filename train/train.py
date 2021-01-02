@@ -11,7 +11,7 @@ from train.model_functions import create_models, get_stop_grad_dec
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
-flags.DEFINE_integer('eval_interval', 1000, '')
+flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
