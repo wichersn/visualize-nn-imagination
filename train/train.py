@@ -21,6 +21,7 @@ flags.DEFINE_float('target_task_metric_val', 0.001, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
 flags.DEFINE_float('early_task_metric_val', 1.0, '')
 flags.DEFINE_float('early_pred_state_metric_val', 1.0, '')
+flags.DEFINE_integer('early_stop_step', 100000, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
@@ -146,7 +147,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
 
-      if step_i == 100000:
+      if step_i == FLAGS.early_stop_step:
         task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
         if not task_good_enough:
           print("STOP not promising enough", flush=True)
