@@ -19,8 +19,8 @@ def num_black_cells(X):
   return val / (FLAGS.board_size ** 2)
 
 def num_black_cells_in_patch(X):
-  targets = skimage.measure.block_reduce(X.numpy(), (1, 1, FLAGS.patch_size, FLAGS.patch_size, 1), np.mean) #CHECK DIMENSIONS
-  return targets.reshape(targets.shape[0], targets.shape[1], -1, targets.shape[3])
+  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG')  #CHECK
+  return targets
 
 
 def convert_model_in(data):

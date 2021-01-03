@@ -5,7 +5,7 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.data_functions import num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch
 from train.model_functions import create_models
 
 
@@ -14,6 +14,7 @@ flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
+flags.DEFINE_integer('patch_size', 2, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
@@ -256,7 +257,7 @@ def main(_):
       'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val}]
   if FLAGS.count_cells:
     task_infos.append(
-      {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
+      {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val})
 
   print("task_infos", task_infos, flush=True)

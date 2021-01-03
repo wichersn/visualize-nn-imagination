@@ -1,5 +1,6 @@
 import tensorflow as tf
 from absl import flags
+from math import ceil
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_timesteps', 3, '')
@@ -54,7 +55,8 @@ def create_models():
   for _ in range(FLAGS.decoder_counter_layers-1):
     decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, strides=FLAGS.decoder_counter_strides, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   decoder_counter.add(tf.keras.layers.Flatten())
-  decoder_counter.add(tf.keras.layers.Dense(1))
+  output_size = ceil(FLAGS.board_size / FLAGS.patch_size)
+  decoder_counter.add(tf.keras.layers.Dense(output_size * output_size))
   print("decoder_counter", decoder_counter.layers)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
