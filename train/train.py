@@ -13,8 +13,8 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 1000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_integer('count_cells', 0, '')
-flags.DEFINE_integer('patch_size', 2, '')
+flags.DEFINE_integer('count_cells', 1, '')
+flags.DEFINE_integer('patch_size', 11, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
@@ -215,7 +215,7 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
 
 class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
   def convert_y(self, y):
-    return tf.math.round(y * (FLAGS.board_size ** 2))
+    return tf.math.round(y * (FLAGS.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
     y_true = self.convert_y(y_true)

@@ -19,7 +19,8 @@ def num_black_cells(X):
   return val / (FLAGS.board_size ** 2)
 
 def num_black_cells_in_patch(X):
-  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG')  #CHECK
+  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG', padding='SAME')  #CHECK
+
   return targets
 
 
