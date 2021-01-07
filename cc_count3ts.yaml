@@ -89,6 +89,12 @@ trainingInput:
         maxValue: 0.01
         scaleType: UNIT_LOG_SCALE
 
+      - parameterName: dec_enc_loss_amount
+        type: DOUBLE
+        minValue: 0.001
+        maxValue: .5
+        scaleType: UNIT_LOG_SCALE
+
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
         minValue: .1

@@ -25,8 +25,8 @@ trainingInput:
         
       - parameterName: board_size
         type: INTEGER
-        minValue: 4
-        maxValue: 4
+        minValue: 10
+        maxValue: 10
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: use_task_autoencoder
@@ -94,6 +94,12 @@ trainingInput:
         minValue: .3
         maxValue: .8
         scaleType: UNIT_LOG_SCALE
+
+      - parameterName: dec_enc_loss_amount
+        type: DOUBLE
+        minValue: 0.0
+        maxValue: 0.0
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: reg_amount
         type: DOUBLE
