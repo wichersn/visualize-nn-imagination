@@ -27,7 +27,7 @@ flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
-flags.DEFINE_float('dec_enc_loss_amount', 0.1, '')
+flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
@@ -110,7 +110,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           flatten_fn = tf.keras.layers.Flatten()
           if task_info["name"] == 'board':
             pred_enc = encoder(pred)
-            dec_enc_loss += tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc)) + 1
+            dec_enc_loss += tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc))
 
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
@@ -131,6 +131,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       for task_info in task_infos:
         reg_loss += sum(task_info['decoder'].losses)
       loss += reg_loss * FLAGS.reg_amount
+      print("FLAGS.dec_enc_loss_amount", FLAGS.dec_enc_loss_amount)
       loss += dec_enc_loss * FLAGS.dec_enc_loss_amount
       reg_loss_metric.update_state([reg_loss])
       dec_enc_loss_metric.update_state([dec_enc_loss])

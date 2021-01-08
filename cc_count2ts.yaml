@@ -139,6 +139,6 @@ trainingInput:
 
       - parameterName: early_stop_step
         type: INTEGER
-        minValue: 100000
-        maxValue: 100000
+        minValue: 150000
+        maxValue: 150000
         scaleType: UNIT_LINEAR_SCALE
