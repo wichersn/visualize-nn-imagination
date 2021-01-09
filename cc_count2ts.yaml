@@ -97,8 +97,8 @@ trainingInput:
 
       - parameterName: dec_enc_loss_amount
         type: DOUBLE
-        minValue: 0.0
-        maxValue: 0.0
+        minValue: 0.001
+        maxValue: 0.5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: reg_amount

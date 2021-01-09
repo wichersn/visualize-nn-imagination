@@ -5,8 +5,9 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, fig_to_image
 from train.model_functions import create_models, get_stop_grad_dec
+import matplotlib.pyplot as plt
 
 
 FLAGS = flags.FLAGS
@@ -110,7 +111,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           flatten_fn = tf.keras.layers.Flatten()
           if task_info["name"] == 'board':
             pred_enc = encoder(pred)
-            dec_enc_loss += tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc))
+            dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc))) + 1
 
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
@@ -130,9 +131,12 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       reg_loss = sum(model.losses)
       for task_info in task_infos:
         reg_loss += sum(task_info['decoder'].losses)
+      print("Loss pre reg", loss)
       loss += reg_loss * FLAGS.reg_amount
+      print("Loss after reg", loss)
       print("FLAGS.dec_enc_loss_amount", FLAGS.dec_enc_loss_amount)
       loss += dec_enc_loss * FLAGS.dec_enc_loss_amount
+      print("Loss after dec enc", loss)
       reg_loss_metric.update_state([reg_loss])
       dec_enc_loss_metric.update_state([dec_enc_loss])
       loss_metric.update_state([loss])
@@ -176,6 +180,16 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
         with writer.as_default():
           for name, metric in metrics:
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
+
+          num_display_imgs = 3
+          model_results = model(batch[:num_display_imgs, 0])
+          gen_boards = get_gens(task_infos[0]['decoder'], model_results, True)
+          save_datas = {"gt": batch[:num_display_imgs, :], "p": gen_boards}
+          figs = plt_data(save_datas)
+          figs[0].show()
+          # plt.show()
+          display_img = [fig_to_image(figs[0])]
+          tf.summary.image("img", display_img, step=step_i, max_outputs=num_display_imgs)
 
         writer.flush()
 
