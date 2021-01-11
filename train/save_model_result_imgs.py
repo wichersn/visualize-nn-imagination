@@ -24,45 +24,58 @@ def plt_boards(boards, axes, pos):
 def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
     datas = {}
 
+    one_datas = None
     for name in input_array_names:
         input_array_path = os.path.join(saved_array_dir, name)
-        datas[name] = np.load(io.gfile.GFile(input_array_path, 'rb'))
+        try:
+            datas[name] = np.load(io.gfile.GFile(input_array_path, 'rb'))
+            one_datas = datas[name]
+        except tf.errors.NotFoundError:
+            print(name, "not in saved arrays", flush=True)
+            continue
 
-    task_gen = None
-    try:
-        input_array_path = os.path.join(saved_array_dir, "task_gen")
-        task_gen = np.load(io.gfile.GFile(input_array_path, 'rb'))
-    except tf.python.framework.errors_impl.NotFoundError:
-        pass
+    # task_gen = None
+    # try:
+    #     input_array_path = os.path.join(saved_array_dir, "task_gen")
+    #     task_gen = np.load(io.gfile.GFile(input_array_path, 'rb'))
+    # except tf.python.framework.errors_impl.NotFoundError:
+    #     pass
 
-    for _ in range(num_to_save):
-        i = random.randint(0, len(datas[name])-1)
-        fig, axes = plt.subplots(len(input_array_names), len(datas[name][i]))
-        for pos, name in enumerate(input_array_names):
-            plt_boards(datas[name][i], axes, pos)
+    if one_datas is not None:
+        for _ in range(num_to_save):
+            i = random.randint(0, len(one_datas)-1)
+            fig, axes = plt.subplots(len(datas), len(one_datas[i]))
+            for pos, name in enumerate(datas):
+                plt_boards(datas[name][i], axes, pos)
 
-        # if task_gen is not None:
-        #     task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
-        #     error = task_gen[i, -1] - task_gt
-        #     file_name = "{}_error{:.4f}.png".format(i, error)
-        # else:
-        #     file_name = "{}.png".format(i)
-        file_name = "{}.png".format(i)
-        img_file = io.gfile.GFile(os.path.join(ouput_dir, file_name), 'wb')
-        plt.savefig(img_file)
-    plt.close('all')
+            # if task_gen is not None:
+            #     task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
+            #     error = task_gen[i, -1] - task_gt
+            #     file_name = "{}_error{:.4f}.png".format(i, error)
+            # else:
+            #     file_name = "{}.png".format(i)
+            file_name = "{}.png".format(i)
+            img_file = io.gfile.GFile(os.path.join(ouput_dir, file_name), 'wb')
+            plt.savefig(img_file)
+        plt.close('all')
 
 def main(_):
     input_array_names = {"eval_datas": "Ground Truth",
                "gen_boards": "Inferred",
-               "adver_gen_boards": "Inferred with adver loss"}
+               "adver_gen_boards": "Inferred with adver loss",
+                         "gen_boards_first_last": "Trained first, last.",
+                         "gen_boards_all": "Trained all.",
+                         }
+
+    for dec_ts in range(5):
+        input_array_names["gen_boards_{}".format(dec_ts)] = "Trained {}".format(dec_ts)
 
     if FLAGS.is_hp_serach_root:
         for i in range(1, 999):
             try:
                 save_imgs(os.path.join(FLAGS.job_dir, str(i)), os.path.join(FLAGS.job_dir, "imgs", str(i)),
                           input_array_names, 20)
-            except tf.python.framework.errors_impl.NotFoundError:
+            except tf.errors.NotFoundError:
                 print("No eval for", i)
     else:
         save_imgs(FLAGS.job_dir, os.path.join(FLAGS.job_dir, "imgs"), input_array_names, 20)

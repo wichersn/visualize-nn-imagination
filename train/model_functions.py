@@ -12,16 +12,37 @@ flags.DEFINE_integer('decoder_counter_layers', 2, 'Only used for the count cells
 flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('use_residual', 1, '')
 flags.DEFINE_integer('use_rnn', 1, '')
+flags.DEFINE_float('dropout_rate', 0.0, '')
 
 leak_relu = tf.keras.layers.LeakyReLU
 
 def create_timestep_model(name=''):
   timestep_model = tf.keras.Sequential(name="timestep_model"+name)
   for _ in range(FLAGS.timestep_layers):
-   timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
+    timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
                          kernel_regularizer=tf.keras.regularizers.l2(1)))
+    timestep_model.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("timestep_model", timestep_model.layers)
   return timestep_model
+
+def add_decoder_layers(decoder, decoder_layers, encoded_size=None):
+  if not encoded_size:
+    encoded_size = FLAGS.encoded_size
+  for _ in range(decoder_layers-1):
+    decoder.add(tf.keras.layers.Conv2D(encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+    decoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
+
+def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
+  decoder = tf.keras.Sequential(
+    [
+      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
+    ], name=name
+  )
+  add_decoder_layers(decoder, decoder_layers, encoded_size)
+  decoder.add(
+    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print(name, decoder.layers)
+  return decoder
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
@@ -30,6 +51,7 @@ def create_models():
   encoder = tf.keras.Sequential(name="encoder")
   for _ in range(FLAGS.encoder_layers):
     encoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)),)
+    encoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("encoder", encoder.layers)
 
   intermediates = [encoder(input_layer)]
@@ -46,14 +68,12 @@ def create_models():
     intermediates.append(timestep)
 
   decoder = tf.keras.Sequential(name="decoder")
-  for _ in range(FLAGS.decoder_layers-1):
-    decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  add_decoder_layers(decoder, FLAGS.decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  for _ in range(FLAGS.decoder_counter_layers - 1):
-    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, strides=FLAGS.decoder_counter_strides, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
   print("decoder_counter", decoder_counter.layers)
@@ -76,16 +96,6 @@ def create_models():
       ], name="discriminator",
   )
 
-  adver_decoder = tf.keras.Sequential(
-    [
-      tf.keras.layers.Lambda(lambda x: tf.keras.backend.stop_gradient(x)),
-    ], name="adver_decoder"
-  )
-  for _ in range(FLAGS.decoder_layers - 1):
-    adver_decoder.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
-                                             kernel_regularizer=tf.keras.regularizers.l2(1)))
-  adver_decoder.add(
-    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("adver_decoder", adver_decoder.layers)
+  adver_decoder = get_stop_grad_dec(FLAGS.decoder_layers, "adver_decoder")
 
   return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator

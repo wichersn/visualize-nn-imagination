@@ -6,32 +6,34 @@ import os
 
 import train.visualize_metric
 from train.data_functions import num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch
-from train.model_functions import create_models
-
+from train.model_functions import create_models, get_stop_grad_dec
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
-flags.DEFINE_integer('eval_interval', 1000, '')
+flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
 flags.DEFINE_integer('count_cells', 0, '')
 flags.DEFINE_integer('patch_size', 1, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
-flags.DEFINE_float('target_task_metric_val', 0.01, '')
+flags.DEFINE_float('target_task_metric_val', 0.001, '')
 flags.DEFINE_float('target_pred_state_metric_val', .01, '')
+flags.DEFINE_float('early_task_metric_val', 1.0, '')
+flags.DEFINE_float('early_pred_state_metric_val', 1.0, '')
+flags.DEFINE_integer('early_stop_step', 100000, '')
 
 flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
-flags.DEFINE_float('reg_amount', 0.01, '')
+flags.DEFINE_float('reg_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, datas, discriminator, should_train_model,
-                    adversarial_task_name, metric_stop_task_name, metric_prefix):
+                    adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
   """This training function was designed to be flexible to work with a variety of tasks.
 
   @ param task_infos: A list of dicts. Each dict specifies the parameters of a task. Keys:
@@ -39,7 +41,8 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     data_fn: A function called on each batch to convert it to the format to train the task,
     decoder, loss_fn: Loss to use between the decoder predictions and data,
     metric_class: Metrics for each timepstep are created using this class,
-    target_metric_val: Training will stop when the metric gets below this value.
+    target_metric_val: Training will stop when the metric gets below this value,
+    early_metric_val: Training will stop if the metric is above this value after x steps
   @param model:
   @param datas: The game of life board states
   @param discriminator:
@@ -49,6 +52,9 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
   @param metric_prefix:
   @return: A function to use for training
   """
+
+  if not max_train_steps:
+    max_train_steps = FLAGS.max_train_steps
 
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
@@ -95,10 +101,7 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
-            # tf.print("batch_targets", batch_targets, "pred", pred)
             loss += task_info['loss_fn'](batch_targets, pred)
-            # tf.print("Training i", i, task_info['name'])
-            # tf.print("loss", loss)
 
           elif task_info["name"] == adversarial_task_name:
             discrim_on_pred = discriminator(pred)
@@ -108,7 +111,6 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
             gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
             loss += generator_loss
             ran_discrim = True
-            print("adversarial i", i, task_info['name'])
 
       reg_loss = sum(model.losses)
       for task_info in task_infos:
@@ -135,49 +137,50 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     
   def train_full():
     writer = tf.summary.create_file_writer(FLAGS.job_dir)
-    eval_datas = gen_data_batch(int(FLAGS.eval_data_size / 100) + 1, FLAGS.num_timesteps)
 
     for name, metric in metrics:
       metric.reset_states()
 
-    for step_i in range(FLAGS.max_train_steps):
+    for step_i in range(max_train_steps):
       batch = get_batch(datas, FLAGS.batch_size)
       adver_batch = get_batch(datas, FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
+
+      if step_i == FLAGS.early_stop_step:
+        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
+        if not task_good_enough:
+          print("STOP not promising enough", flush=True)
+          return
+
       if step_i % FLAGS.eval_interval == 0:
         with writer.as_default():
           for name, metric in metrics:
-            print(step_i, name, metric.result().numpy())
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
         writer.flush()
 
-        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name)
+        task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
         if task_good_enough and step_i > 0:
-          print("STOP good enough", flush=True)
           return
-        if step_i >= FLAGS.max_train_steps - 3:
-          print("STOP close to end", flush=True)
+        if step_i >= max_train_steps - 3:
           return  # So the metric values don't get reset when there's only a few timesteps left.
 
         for name, metric in metrics:
           metric.reset_states()
-    print("STOP end of loop", flush=True)
   return train_full
 
-def is_task_good_enough(task_infos, metric_stop_task_name):
+def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
   for task_info in task_infos:
     if metric_stop_task_name == task_info["name"]:
       metric_stop_task = task_info
 
   metric_index = max(metric_stop_task['train_indexes'])
-  print("metric_index", metric_index)
   stop_metric = metric_stop_task['metrics'][metric_index]
 
   metric_result = stop_metric.result().numpy()
-  print("stop metric result", metric_result, "target_metric_val", metric_stop_task['target_metric_val'])
-  return metric_result < metric_stop_task['target_metric_val'], metric_result
+  print("stop metric result", metric_result, target_val_name, metric_stop_task[target_val_name])
+  return metric_result < metric_stop_task[target_val_name], metric_result
 
 def get_gens(decoder, model_results, is_img):
   gen_boards = []
@@ -214,6 +217,7 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
     return 1 - super().result()
 
 class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
+  """Gives 1- the accuracy whe the prediction is rounded to the nearest integer."""
   def convert_y(self, y):
     return tf.math.round(y * (FLAGS.board_size ** 2))
 
@@ -232,7 +236,7 @@ def save_np(data, name):
     np.save(file, data)
 
 def main(_):
-  datas = gen_data_batch(100000, FLAGS.num_timesteps)
+  datas = gen_data_batch(200000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
 
@@ -254,18 +258,20 @@ def main(_):
 
   task_infos = [
     {'name': 'board', 'train_indexes': board_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder,
-      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val}]
+      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
+     'early_metric_val': FLAGS.early_pred_state_metric_val}]
   if FLAGS.count_cells:
     task_infos.append(
       {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val})
+      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+       'early_metric_val': FLAGS.early_task_metric_val})
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
-  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=True,
+  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=True,
                     adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
 
-  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name)
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
@@ -289,7 +295,6 @@ def main(_):
   # Only consider the indexes we train the board on as train indexes.
   # The indexes that count cells is trained on could still be non train indexes
   non_train_indexies = all_indexes - board_train_indexes
-  print("all_indexes, board_train_indexes, non_train_indexies", all_indexes, board_train_indexes, non_train_indexies)
   save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
   save_np(eval_datas, "eval_datas")
@@ -299,6 +304,23 @@ def main(_):
   if FLAGS.count_cells:
     task_gen = get_gens(decoder_counter, model_results, True)
     save_np(task_gen, "task_gen")
+
+
+  def fine_tune_new_decoder(train_indexes, name):
+    print("Train decoder {}".format(name))
+    task_infos[0]["train_indexes"] = train_indexes
+    task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
+    print("task infos", task_infos)
+    get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=False,
+                      adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+                    max_train_steps=int(FLAGS.max_train_steps/10))()
+    new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
+    save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
+
+  fine_tune_new_decoder({0, FLAGS.num_timesteps}, "first_last")
+  fine_tune_new_decoder(set(range(FLAGS.num_timesteps+1)), "all")
+  for dec_ts in range(FLAGS.num_timesteps + 1):
+    fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)
