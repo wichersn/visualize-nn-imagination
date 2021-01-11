@@ -2,7 +2,6 @@ import numpy as np
 from scipy.signal import convolve2d
 from absl import flags
 import tensorflow as tf
-import skimage.measure
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('board_size', 20, '')
@@ -19,8 +18,8 @@ def num_black_cells(X):
   return val / (FLAGS.board_size ** 2)
 
 def num_black_cells_in_patch(X):
-  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG', padding='SAME')  #CHECK
-
+  # X is [batch_size, timesteps, board_size, board_size, 1] and val is [batch_size, timesteps, 1]
+  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG', padding='SAME')
   return targets
 
 

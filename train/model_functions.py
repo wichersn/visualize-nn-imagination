@@ -52,9 +52,10 @@ def create_models():
   print("decoder", decoder.layers)
 
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  for _ in range(FLAGS.decoder_counter_layers-1):
-    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  decoder_counter.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  for _ in range(FLAGS.decoder_counter_layers - 1):
+    decoder_counter.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, strides=FLAGS.decoder_counter_strides, activation=leak_relu(), padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  decoder_counter.add(tf.keras.layers.Flatten())
+  decoder_counter.add(tf.keras.layers.Dense(1))
   print("decoder_counter", decoder_counter.layers)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
