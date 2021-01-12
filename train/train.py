@@ -302,7 +302,7 @@ def main(_):
   save_np(adver_gen_boards, "adver_gen_boards")
 
   if FLAGS.count_cells:
-    task_gen = get_gens(decoder_counter, model_results, True)
+    task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 
 

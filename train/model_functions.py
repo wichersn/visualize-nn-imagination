@@ -1,6 +1,5 @@
 import tensorflow as tf
 from absl import flags
-from math import ceil
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('num_timesteps', 3, '')
