@@ -117,7 +117,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           pred = task_info['decoder'](model_outputs[i])
 
           flatten_fn = tf.keras.layers.Flatten()
-          if task_info["name"] == 'board':
+          if task_info["name"] == 'board' and FLAGS.dec_enc_loss_amount > 1e-20:
             pred_enc = encoder(pred)
             dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc))) + 1
 
