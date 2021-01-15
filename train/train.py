@@ -188,8 +188,8 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           figs = plt_data(save_datas)
           figs[0].show()
           # plt.show()
-          display_img = [fig_to_image(figs[0])]
-          tf.summary.image("img", display_img, step=step_i, max_outputs=num_display_imgs)
+          display_img = [fig_to_image(fig) for fig in figs]
+          tf.summary.image(metric_prefix + "/" + "img", display_img, step=step_i, max_outputs=num_display_imgs)
 
         writer.flush()
 
@@ -334,26 +334,26 @@ def main(_):
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
 
-  if FLAGS.count_cells:
-    task_gen = get_gens(decoder_counter, model_results, False)
-    save_np(task_gen, "task_gen")
-
-
-  def fine_tune_new_decoder(train_indexes, name):
-    print("Train decoder {}".format(name))
-    task_infos[0]["train_indexes"] = train_indexes
-    task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
-    print("task infos", task_infos)
-    get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-                      adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
-                    max_train_steps=int(FLAGS.max_train_steps/10))()
-    new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
-    save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
-
-  fine_tune_new_decoder({0, FLAGS.num_timesteps}, "first_last")
-  fine_tune_new_decoder(set(range(FLAGS.num_timesteps+1)), "all")
-  for dec_ts in range(FLAGS.num_timesteps + 1):
-    fine_tune_new_decoder({dec_ts}, dec_ts)
+  # if FLAGS.count_cells:
+  #   task_gen = get_gens(decoder_counter, model_results, False)
+  #   save_np(task_gen, "task_gen")
+  #
+  #
+  # def fine_tune_new_decoder(train_indexes, name):
+  #   print("Train decoder {}".format(name))
+  #   task_infos[0]["train_indexes"] = train_indexes
+  #   task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
+  #   print("task infos", task_infos)
+  #   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
+  #                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+  #                   max_train_steps=int(FLAGS.max_train_steps/10))()
+  #   new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
+  #   save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
+  #
+  # fine_tune_new_decoder({0, FLAGS.num_timesteps}, "first_last")
+  # fine_tune_new_decoder(set(range(FLAGS.num_timesteps+1)), "all")
+  # for dec_ts in range(FLAGS.num_timesteps + 1):
+  #   fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)

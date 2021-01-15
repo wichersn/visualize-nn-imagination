@@ -70,12 +70,11 @@ def plt_data(datas):
 def fig_to_image(fig):
   DPI = 100
   io_buf = io.BytesIO()
-  fig.savefig(io_buf, format='raw', dpi=DPI)
+  fig.savefig(io_buf, format='png')
   io_buf.seek(0)
-  img_arr = np.reshape(np.frombuffer(io_buf.getvalue(), dtype=np.uint8),
-                       newshape=(int(fig.bbox.bounds[3]), int(fig.bbox.bounds[2]), -1))
+  image = tf.image.decode_png(io_buf.getvalue(), channels=4)
   io_buf.close()
-  return img_arr
+  return image
 
 def plt_boards_debug(boards):
   """Use this function in get_batch to debug. Ex: plt_boards(datas[idx][0]), plt_boards(np.array([targets[idx][0]]))"""
