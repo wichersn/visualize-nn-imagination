@@ -6,13 +6,13 @@ import os
 
 import train.visualize_metric
 from train.data_functions import num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch
-from train.model_functions import create_models, get_stop_grad_dec
+from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_integer('count_cells', 0, '')
+flags.DEFINE_string('task', 'patch', '')
 flags.DEFINE_integer('patch_size', 1, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
@@ -217,9 +217,23 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
     return 1 - super().result()
 
 class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
-  """Gives 1- the accuracy whe the prediction is rounded to the nearest integer."""
+  """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
   def convert_y(self, y):
     return tf.math.round(y * (FLAGS.board_size ** 2))
+
+  def update_state(self, y_true, y_pred, sample_weight=None):
+    y_true = self.convert_y(y_true)
+    y_pred = self.convert_y(y_pred)
+
+    return super().update_state(y_true, y_pred, sample_weight)
+
+  def result(self):
+    return 1 - super().result()
+
+class PatchAccuracyInverseMetric(tf.keras.metrics.Accuracy):
+  """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
+  def convert_y(self, y):
+    return tf.math.round(y * (FLAGS.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
     y_true = self.convert_y(y_true)
@@ -238,32 +252,45 @@ def save_np(data, name):
 def main(_):
   datas = gen_data_batch(200000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
-  encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
+  encoder, intermediates, adver_decoder, model, discriminator = create_models()
+  decoder = create_gol_decoder()
+  decoder_counter = create_count_decoder()
+  decoder_patch = create_patch_decoder()
 
-  board_train_indexes = set()
+  gol_train_indexes = set()
   if FLAGS.use_autoencoder:
-    board_train_indexes.add(0)
-  if not FLAGS.count_cells:
-    board_train_indexes.add(FLAGS.num_timesteps)
+    gol_train_indexes.add(0)
+  if FLAGS.task == 'gol':
+    gol_train_indexes.add(FLAGS.num_timesteps)
 
   count_train_indexes = set()
   if FLAGS.use_task_autoencoder:
     count_train_indexes.add(0)
   count_train_indexes.add(FLAGS.num_timesteps)
 
-  if FLAGS.count_cells:
+  patch_train_indexes = set()
+  if FLAGS.use_task_autoencoder:
+    patch_train_indexes.add(0)
+  patch_train_indexes.add(FLAGS.num_timesteps)
+
+  if FLAGS.task == 'count_cells':
     metric_stop_task_name = 'count'
   else:
     metric_stop_task_name = 'board'
 
   task_infos = [
-    {'name': 'board', 'train_indexes': board_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder,
+    {'name': 'board', 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
       'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
-  if FLAGS.count_cells:
+  if FLAGS.task == 'count_cells':
     task_infos.append(
       {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+       'early_metric_val': FLAGS.early_task_metric_val})
+  if FLAGS.task == 'patch':
+    task_infos.append(
+      {'name': 'count', 'train_indexes': patch_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
+      'loss_fn': mse_loss, 'metric_class': PatchAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
   print("task_infos", task_infos, flush=True)
@@ -294,14 +321,14 @@ def main(_):
   all_indexes = set(range(FLAGS.num_timesteps+1))
   # Only consider the indexes we train the board on as train indexes.
   # The indexes that count cells is trained on could still be non train indexes
-  non_train_indexies = all_indexes - board_train_indexes
+  non_train_indexies = all_indexes - gol_train_indexes
   save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
 
   save_np(eval_datas, "eval_datas")
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
 
-  if FLAGS.count_cells:
+  if FLAGS.task == 'count_cells':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 

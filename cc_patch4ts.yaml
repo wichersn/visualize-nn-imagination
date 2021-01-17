@@ -13,12 +13,18 @@ trainingInput:
     params:
       - parameterName: task
         type: CATEGORICAL
-        categoricalValues: ['count_cells']
+        categoricalValues: ['patch']
         
-      - parameterName: num_timesteps
+      - parameterName: patch_size
         type: INTEGER
         minValue: 2
         maxValue: 2
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: num_timesteps
+        type: INTEGER
+        minValue: 4
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
         
       - parameterName: board_size
@@ -42,25 +48,25 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 2
-        maxValue: 5
+        minValue: 4
+        maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
         type: INTEGER
         minValue: 1
-        maxValue: 2
+        maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_layers
         type: INTEGER
         minValue: 2
-        maxValue: 4
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_counter_strides
@@ -71,35 +77,29 @@ trainingInput:
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 2
-        maxValue: 30
+        minValue: 30
+        maxValue: 50
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 400
-        maxValue: 512
+        minValue: 100
+        maxValue: 300
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: 0.0001
-        maxValue: 0.001
+        minValue: 0.00001
+        maxValue: 0.0001
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
         minValue: .3
-        maxValue: .8
+        maxValue: .6
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount
-        type: DOUBLE
-        minValue: 0.0
-        maxValue: 0.0
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: dropout_rate
         type: DOUBLE
         minValue: 0.0
         maxValue: 0.0
@@ -119,18 +119,6 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 1000000
-        maxValue: 1000000
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: early_task_metric_val
-        type: DOUBLE
-        minValue: 0.7
-        maxValue: 0.7
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: early_stop_step
-        type: INTEGER
-        minValue: 100000
-        maxValue: 100000
+        minValue: 500000
+        maxValue: 500000
         scaleType: UNIT_LINEAR_SCALE

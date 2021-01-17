@@ -7,7 +7,7 @@ from tensorflow import io
 import tensorflow as tf
 from absl import app
 import random
-from data_functions import num_black_cells
+from train.data_functions import num_black_cells
 
 FLAGS = flags.FLAGS
 

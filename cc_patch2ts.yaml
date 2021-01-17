@@ -11,11 +11,9 @@ trainingInput:
     maxTrials: 20
     maxParallelTrials: 5
     params:
-      - parameterName: count_cells
-        type: INTEGER
-        minValue: 0
-        maxValue: 0
-        scaleType: UNIT_LINEAR_SCALE
+      - parameterName: task
+        type: CATEGORICAL
+        categoricalValues: ['patch']
         
       - parameterName: patch_size
         type: INTEGER
