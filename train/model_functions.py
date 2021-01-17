@@ -2,7 +2,7 @@ import tensorflow as tf
 from absl import flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('num_timesteps', 3, '')
+flags.DEFINE_integer('model_timesteps', 3, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
@@ -57,7 +57,7 @@ def create_models():
 
   if FLAGS.use_rnn:
     timestep_model = create_timestep_model()
-  for i in range(FLAGS.num_timesteps):
+  for i in range(FLAGS.model_timesteps):
     if not FLAGS.use_rnn:
       timestep_model = create_timestep_model('_'+str(i))
 

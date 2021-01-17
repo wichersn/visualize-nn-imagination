@@ -58,17 +58,22 @@ def plt_boards(boards, axes, pos):
     axes[pos, i].axis('off')
 
 def plt_data(datas):
-    one_datas = list(datas.values())[0]
+    one_datas = []
+    for data in datas.values():
+        if len(one_datas) > len(data):
+            one_datas = data
+
+    # one_datas = list(datas.values())[0]
     figs = []
     for i in range(len(one_datas)):
         fig, axes = plt.subplots(len(datas), len(one_datas[i]))
         for pos, name in enumerate(datas):
-            plt_boards(datas[name][i], axes, pos)
+            if len(datas[name]) > i:
+              plt_boards(datas[name][i], axes, pos)
         figs.append(fig)
     return figs
 
 def fig_to_image(fig):
-  DPI = 100
   io_buf = io.BytesIO()
   fig.savefig(io_buf, format='png')
   io_buf.seek(0)
