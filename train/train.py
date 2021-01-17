@@ -5,7 +5,7 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, fig_to_image
 from train.model_functions import create_models, get_stop_grad_dec
 
 
@@ -27,12 +27,13 @@ flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
+flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
 
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
-def get_train_model(task_infos, model, datas, discriminator, should_train_model,
+def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
   """This training function was designed to be flexible to work with a variety of tasks.
 
@@ -59,15 +60,21 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
   discrim_acc_metric = tf.keras.metrics.BinaryAccuracy()
   gen_acc_metric = tf.keras.metrics.BinaryAccuracy()
   reg_loss_metric = tf.keras.metrics.Mean()
+  dec_enc_loss_metric = tf.keras.metrics.Mean()
+  loss_metric = tf.keras.metrics.Mean()
   metrics = [
     ["discrim_acc", discrim_acc_metric],
     ["gen_acc", gen_acc_metric],
     ["reg loss", reg_loss_metric],
+    ["dec_enc_loss", dec_enc_loss_metric],
+    ["loss", loss_metric],
   ]
   for task_info in task_infos:
     task_info['metrics'] = [task_info['metric_class']() for _ in range(FLAGS.num_timesteps+1)]
     for i in range(FLAGS.num_timesteps + 1):
       metrics.append(["{}_metric_at_{}".format(task_info['name'], i), task_info['metrics'][i]])
+    task_info['loss_metric'] = tf.keras.metrics.Mean()
+    metrics.append(["{}_loss_metric".format(task_info['name']), task_info['loss_metric']])
 
   lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=FLAGS.learning_rate,
                                                                decay_steps=100000,
@@ -84,6 +91,15 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
     total_loss = real_loss + fake_loss
     return total_loss
 
+  def save_image_summary(batch, step_i):
+    num_display_imgs = 3
+    model_results = model(batch[:num_display_imgs, 0])
+    gen_boards = get_gens(task_infos[0]['decoder'], model_results, True)
+    save_datas = {"gt": batch[:num_display_imgs, :], "p": gen_boards}
+    figs = plt_data(save_datas)
+    display_img = [fig_to_image(fig) for fig in figs]
+    tf.summary.image(metric_prefix, display_img, step=step_i, max_outputs=num_display_imgs)
+
   @tf.function
   def train_step(batch, adver_batch):
     inputs_batch = batch[:, 0]
@@ -91,7 +107,8 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       discriminator_loss = 0.0
       ran_discrim = False
       model_outputs = model(inputs_batch)
-      loss = 0
+      loss = 0.0
+      dec_enc_loss = 0.0
 
       for i in range(FLAGS.num_timesteps+1):
         for task_info in task_infos:
@@ -99,9 +116,16 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
 
           pred = task_info['decoder'](model_outputs[i])
 
+          flatten_fn = tf.keras.layers.Flatten()
+          if task_info["name"] == 'board' and FLAGS.dec_enc_loss_amount > 1e-20:
+            pred_enc = encoder(pred)
+            dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[i]), flatten_fn(pred_enc))) + 1
+
           task_info['metrics'][i].update_state(batch_targets, pred)
           if i in task_info['train_indexes']:
-            loss += task_info['loss_fn'](batch_targets, pred)
+            current_loss = task_info['loss_fn'](batch_targets, pred)
+            loss += current_loss
+            task_info['loss_metric'].update_state(current_loss)
 
           elif task_info["name"] == adversarial_task_name:
             discrim_on_pred = discriminator(pred)
@@ -115,8 +139,11 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
       reg_loss = sum(model.losses)
       for task_info in task_infos:
         reg_loss += sum(task_info['decoder'].losses)
-      reg_loss_metric.update_state([reg_loss])
       loss += reg_loss * FLAGS.reg_amount
+      loss += dec_enc_loss * FLAGS.dec_enc_loss_amount
+      reg_loss_metric.update_state([reg_loss])
+      dec_enc_loss_metric.update_state([dec_enc_loss])
+      loss_metric.update_state([loss])
 
     trainable_weights = []
     if should_train_model:
@@ -157,6 +184,8 @@ def get_train_model(task_infos, model, datas, discriminator, should_train_model,
         with writer.as_default():
           for name, metric in metrics:
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
+
+          save_image_summary(batch, step_i)
 
         writer.flush()
 
@@ -268,7 +297,7 @@ def main(_):
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
-  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=True,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
                     adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
 
   task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
@@ -280,11 +309,11 @@ def main(_):
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
-  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
 
   print("Training Only Decoder Adversarial")
-  get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=discriminator, should_train_model=False,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
 
   model_results = model(eval_datas[:, 0])
@@ -311,7 +340,7 @@ def main(_):
     task_infos[0]["train_indexes"] = train_indexes
     task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
     print("task infos", task_infos)
-    get_train_model(task_infos=task_infos, model=model, datas=datas, discriminator=None, should_train_model=False,
+    get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
                       adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
                     max_train_steps=int(FLAGS.max_train_steps/10))()
     new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)

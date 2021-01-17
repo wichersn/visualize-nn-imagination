@@ -2,6 +2,8 @@ import numpy as np
 from scipy.signal import convolve2d
 from absl import flags
 import tensorflow as tf
+import matplotlib.pyplot as plt
+import io
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('board_size', 20, '')
@@ -46,7 +48,35 @@ def gen_data_batch(size, skip):
 
   return datas
 
-def plt_boards(boards):
+def get_batch(datas, batch_size):
+    idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
+    return datas[idx]
+
+def plt_boards(boards, axes, pos):
+  for i in range(len(boards)):
+    axes[pos, i].imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
+    axes[pos, i].axis('off')
+
+def plt_data(datas):
+    one_datas = list(datas.values())[0]
+    figs = []
+    for i in range(len(one_datas)):
+        fig, axes = plt.subplots(len(datas), len(one_datas[i]))
+        for pos, name in enumerate(datas):
+            plt_boards(datas[name][i], axes, pos)
+        figs.append(fig)
+    return figs
+
+def fig_to_image(fig):
+  DPI = 100
+  io_buf = io.BytesIO()
+  fig.savefig(io_buf, format='png')
+  io_buf.seek(0)
+  image = tf.image.decode_png(io_buf.getvalue(), channels=4)
+  io_buf.close()
+  return image
+
+def plt_boards_debug(boards):
   """Use this function in get_batch to debug. Ex: plt_boards(datas[idx][0]), plt_boards(np.array([targets[idx][0]]))"""
   import matplotlib.pyplot as plt
 
@@ -57,7 +87,3 @@ def plt_boards(boards):
     plt.imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
     plt.axis('off')
   plt.show()
-
-def get_batch(datas, batch_size):
-    idx = np.random.choice(np.arange(len(datas)), batch_size, replace=False)
-    return datas[idx]

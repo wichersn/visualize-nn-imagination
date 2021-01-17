@@ -103,18 +103,18 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 1500000
-        maxValue: 1500000
+        minValue: 900000
+        maxValue: 900000
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: early_task_metric_val
         type: DOUBLE
-        minValue: 0.7
-        maxValue: 0.7
+        minValue: 0.4
+        maxValue: 0.4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: early_stop_step
         type: INTEGER
-        minValue: 500000
-        maxValue: 500000
+        minValue: 200000
+        maxValue: 200000
         scaleType: UNIT_LINEAR_SCALE
