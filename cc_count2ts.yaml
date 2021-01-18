@@ -93,6 +93,12 @@ trainingInput:
         maxValue: .8
         scaleType: UNIT_LOG_SCALE
 
+      - parameterName: dec_enc_loss_amount
+        type: DOUBLE
+        minValue: 0.001
+        maxValue: 0.5
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: reg_amount
         type: DOUBLE
         minValue: 0.0
@@ -131,6 +137,6 @@ trainingInput:
 
       - parameterName: early_stop_step
         type: INTEGER
-        minValue: 100000
-        maxValue: 100000
+        minValue: 150000
+        maxValue: 150000
         scaleType: UNIT_LINEAR_SCALE

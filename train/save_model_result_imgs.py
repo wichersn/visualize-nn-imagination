@@ -6,8 +6,7 @@ import os
 from tensorflow import io
 import tensorflow as tf
 from absl import app
-import random
-from train.data_functions import num_black_cells
+from train.data_functions import plt_data
 
 FLAGS = flags.FLAGS
 
@@ -16,47 +15,28 @@ flags.DEFINE_string('job_dir', '',
 flags.DEFINE_alias('job-dir', 'job_dir')
 flags.DEFINE_bool('is_hp_serach_root', False, '')
 
-def plt_boards(boards, axes, pos):
-  for i in range(len(boards)):
-    axes[pos, i].imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
-    axes[pos, i].axis('off')
-
 def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
     datas = {}
 
-    one_datas = None
     for name in input_array_names:
         input_array_path = os.path.join(saved_array_dir, name)
         try:
             datas[name] = np.load(io.gfile.GFile(input_array_path, 'rb'))
-            one_datas = datas[name]
         except tf.errors.NotFoundError:
             print(name, "not in saved arrays", flush=True)
             continue
 
-    # task_gen = None
-    # try:
-    #     input_array_path = os.path.join(saved_array_dir, "task_gen")
-    #     task_gen = np.load(io.gfile.GFile(input_array_path, 'rb'))
-    # except tf.python.framework.errors_impl.NotFoundError:
-    #     pass
+    if len(datas) > 0:
+        one_datas = list(datas.values())[0]
+        idx = np.random.choice(np.arange(len(one_datas)), num_to_save, replace=False)
+        for key in datas:
+            datas[key] = datas[key][idx]
+        figs = plt_data(datas)
 
-    if one_datas is not None:
-        for _ in range(num_to_save):
-            i = random.randint(0, len(one_datas)-1)
-            fig, axes = plt.subplots(len(datas), len(one_datas[i]))
-            for pos, name in enumerate(datas):
-                plt_boards(datas[name][i], axes, pos)
-
-            # if task_gen is not None:
-            #     task_gt = num_black_cells(datas["eval_datas"][i])[-1][0]
-            #     error = task_gen[i, -1] - task_gt
-            #     file_name = "{}_error{:.4f}.png".format(i, error)
-            # else:
-            #     file_name = "{}.png".format(i)
+        for i in range(len(figs)):
             file_name = "{}.png".format(i)
             img_file = io.gfile.GFile(os.path.join(ouput_dir, file_name), 'wb')
-            plt.savefig(img_file)
+            figs[i].savefig(img_file)
         plt.close('all')
 
 def main(_):
