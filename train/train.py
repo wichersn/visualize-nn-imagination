@@ -216,10 +216,15 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
     return 1 - super().result()
 
-class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
+class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
   """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
+  patch_size = 1
+  def __init__(self, patch_size):
+    self.patch_size = patch_size
+    super().__init__()
+
   def convert_y(self, y):
-    return tf.math.round(y * (FLAGS.board_size ** 2))
+    return tf.math.round(y * (self.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
     y_true = self.convert_y(y_true)
@@ -229,21 +234,6 @@ class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
 
   def result(self):
     return 1 - super().result()
-
-class PatchAccuracyInverseMetric(tf.keras.metrics.Accuracy):
-  """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
-  def convert_y(self, y):
-    return tf.math.round(y * (FLAGS.patch_size ** 2))
-
-  def update_state(self, y_true, y_pred, sample_weight=None):
-    y_true = self.convert_y(y_true)
-    y_pred = self.convert_y(y_pred)
-
-    return super().update_state(y_true, y_pred, sample_weight)
-
-  def result(self):
-    return 1 - super().result()
-
 
 def save_np(data, name):
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
@@ -263,15 +253,10 @@ def main(_):
   if FLAGS.task == 'gol':
     gol_train_indexes.add(FLAGS.num_timesteps)
 
-  count_train_indexes = set()
+  task_train_indexes = set()
   if FLAGS.use_task_autoencoder:
-    count_train_indexes.add(0)
-  count_train_indexes.add(FLAGS.num_timesteps)
-
-  patch_train_indexes = set()
-  if FLAGS.use_task_autoencoder:
-    patch_train_indexes.add(0)
-  patch_train_indexes.add(FLAGS.num_timesteps)
+    task_train_indexes.add(0)
+  task_train_indexes.add(FLAGS.num_timesteps)
 
   if FLAGS.task == 'count_cells':
     metric_stop_task_name = 'count'
@@ -284,13 +269,13 @@ def main(_):
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
   if FLAGS.task == 'count_cells':
     task_infos.append(
-      {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
+      'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
   if FLAGS.task == 'patch':
     task_infos.append(
-      {'name': 'count', 'train_indexes': patch_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
-      'loss_fn': mse_loss, 'metric_class': PatchAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
+      'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
   print("task_infos", task_infos, flush=True)

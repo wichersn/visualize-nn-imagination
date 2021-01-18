@@ -56,14 +56,10 @@ def create_gol_decoder():
   add_decoder_layers(decoder, FLAGS.decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print("decoder", decoder.layers)
-  return  decoder
+  return decoder
 
 def create_patch_decoder():
-  decoder = tf.keras.Sequential(name="decoder-patch")
-  add_decoder_layers(decoder, FLAGS.decoder_layers)
-  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("decoder_patch", decoder.layers)
-  return  decoder
+  return create_gol_decoder()
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
