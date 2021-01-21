@@ -2,7 +2,7 @@ import tensorflow as tf
 from absl import flags
 
 FLAGS = flags.FLAGS
-flags.DEFINE_integer('model_timesteps', 3, '')
+flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')

@@ -1,5 +1,6 @@
 import numpy as np
-
+from absl import flags
+FLAGS = flags.FLAGS
 
 def single_index_metric(gt, gen, thresh):
   """Returns the porportion of gen instances close enough to the ground truth."""
@@ -27,8 +28,9 @@ def single_gt_index_metric(gt, gen_boards, thresh, non_train_indexies):
 def visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies):
   """Averages the metric on each of the ground truth states."""
   total_metric = 0
-  for i in non_train_indexies:
-    total_metric += single_gt_index_metric(eval_datas[:, i], gen_boards, thresh, non_train_indexies)
+  for model_i in non_train_indexies:
+    game_i = model_i * FLAGS.game_timesteps // FLAGS.model_timesteps
+    total_metric += single_gt_index_metric(eval_datas[:, game_i], gen_boards, thresh, non_train_indexies)
   return total_metric / float(len(non_train_indexies))
 
 

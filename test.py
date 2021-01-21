@@ -16,6 +16,8 @@ class MetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
         self.metric_test_eval_datas = gen_data_batch(2000, 4)
+        FLAGS.game_timesteps = 4
+        FLAGS.model_timesteps = 4
 
     def metric_asserts(self, eval_datas, gen_boards, thresh, expected_min, expected_max):
         metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
