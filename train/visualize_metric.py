@@ -27,11 +27,14 @@ def single_gt_index_metric(gt, gen_boards, thresh, non_train_indexies):
 
 def visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies):
   """Averages the metric on each of the ground truth states."""
+  train_indexies = np.array(list(set(range(gen_boards.shape[1])) - set(non_train_indexies)))
+  game_train_indexes = train_indexies * eval_datas.shape[1] // gen_boards.shape[1]
+  game_non_train_indexes = set(range(eval_datas.shape[1])) - set(game_train_indexes)
   total_metric = 0
-  for model_i in non_train_indexies:
-    game_i = model_i * FLAGS.game_timesteps // FLAGS.model_timesteps
+  for game_i in game_non_train_indexes:
     total_metric += single_gt_index_metric(eval_datas[:, game_i], gen_boards, thresh, non_train_indexies)
-  return total_metric / float(len(non_train_indexies))
+
+  return total_metric / float(min(len(non_train_indexies), len(game_non_train_indexes)))
 
 
 def combine_metric(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
