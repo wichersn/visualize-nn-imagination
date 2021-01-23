@@ -11,7 +11,13 @@ trainingInput:
     maxTrials: 20
     maxParallelTrials: 5
     params:
-      - parameterName: num_timesteps
+      - parameterName: game_timesteps
+        type: INTEGER
+        minValue: 4
+        maxValue: 4
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: model_timesteps
         type: INTEGER
         minValue: 4
         maxValue: 4
