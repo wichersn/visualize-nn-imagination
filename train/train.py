@@ -301,6 +301,8 @@ def main(_):
       'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
+  FLAGS.append_flags_into_file(os.path.join(FLAGS.job_dir, 'flagfile.txt'))
+
   print("task_infos", task_infos, flush=True)
   print("Full model training")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
