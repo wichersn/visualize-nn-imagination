@@ -6,7 +6,7 @@ import os
 
 import train.visualize_metric
 from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, fig_to_image
-from train.model_functions import create_models, get_stop_grad_dec
+from train.model_functions import create_models, get_stop_grad_dec, save_model
 
 
 FLAGS = flags.FLAGS
@@ -30,8 +30,6 @@ flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
 
-flags.DEFINE_string('job_dir', '',
-                    'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
@@ -301,7 +299,8 @@ def main(_):
       'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
-  FLAGS.append_flags_into_file(os.path.join(FLAGS.job_dir, 'flagfile.txt'))
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'a') as out_file:
+    out_file.write(FLAGS.flags_into_string())
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
@@ -312,6 +311,12 @@ def main(_):
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
+
+  save_model(encoder, 'encoder')
+  save_model(decoder, 'decoder')
+  save_model(model, 'model')
+  if FLAGS.count_cells:
+    save_model(decoder_counter, 'decoder_counter')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.

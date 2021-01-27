@@ -1,7 +1,10 @@
+import os
+
 import tensorflow as tf
 from absl import flags
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('job_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
@@ -42,6 +45,19 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
     tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print(name, decoder.layers)
   return decoder
+
+def get_save_path(name):
+  return os.path.join(FLAGS.job_dir, name+"_ckpt", 'ckpt')
+
+def save_model(model, name):
+  model.save_weights(get_save_path(name))
+
+def maybe_load_model(model, name):
+  try:
+    model.load_weights(get_save_path(name))
+    print(name + " model loaded")
+  except tf.errors.NotFoundError:
+    pass
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
@@ -96,5 +112,10 @@ def create_models():
   )
 
   adver_decoder = get_stop_grad_dec(FLAGS.decoder_layers, "adver_decoder")
+
+  maybe_load_model(encoder, 'encoder')
+  maybe_load_model(decoder, 'decoder')
+  maybe_load_model(model, 'model')
+  maybe_load_model(decoder_counter, 'decoder_counter')
 
   return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator
