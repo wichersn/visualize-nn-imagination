@@ -341,21 +341,22 @@ def main(_):
     save_np(task_gen, "task_gen")
 
 
-  # def fine_tune_new_decoder(train_indexes, name):
-  #   print("Train decoder {}".format(name))
-  #   task_infos[0]["train_indexes"] = train_indexes
-  #   task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
-  #   print("task infos", task_infos)
-  #   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-  #                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
-  #                   max_train_steps=int(FLAGS.max_train_steps/10))()
-  #   new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
-  #   save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
-  #
-  # fine_tune_new_decoder({0, FLAGS.model_timesteps}, "first_last")
-  # fine_tune_new_decoder(set(range(FLAGS.model_timesteps+1)), "all")
-  # for dec_ts in range(FLAGS.model_timesteps + 1):
-  #   fine_tune_new_decoder({dec_ts}, dec_ts)
+  if FLAGS.game_timesteps == FLAGS.model_timesteps:
+    def fine_tune_new_decoder(train_indexes, name):
+      print("Train decoder {}".format(name))
+      task_infos[0]["train_indexes"] = train_indexes
+      task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
+      print("task infos", task_infos)
+      get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
+                        adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+                      max_train_steps=int(FLAGS.max_train_steps/10))()
+      new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
+      save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
+
+    fine_tune_new_decoder({0, FLAGS.model_timesteps}, "first_last")
+    fine_tune_new_decoder(set(range(FLAGS.model_timesteps+1)), "all")
+    for dec_ts in range(FLAGS.model_timesteps + 1):
+      fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)
