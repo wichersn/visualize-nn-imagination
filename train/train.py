@@ -173,6 +173,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       adver_batch = get_batch(datas, FLAGS.batch_size)
 
       train_step(tf.constant(batch), tf.constant(adver_batch))
+      print('reg', model.losses)
 
       if step_i == FLAGS.early_stop_step:
         task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
@@ -234,9 +235,9 @@ def save_metric_result(metric_result, metric_name):
     tf.summary.scalar(metric_name, metric_result, step=0)
   writer.flush()
 
-def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
-  adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
-  regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
+def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
+  adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
+  regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
   save_metric_result(adver_metric, "adver_metric_result")
   save_metric_result(regular_metric, "regular_metric_result")
   save_metric_result(max(regular_metric, adver_metric), "final_metric_result")
@@ -336,7 +337,7 @@ def main(_):
   # Only consider the indexes we train the board on as train indexes.
   # The indexes that count cells is trained on could still be non train indexes
   non_train_indexies = all_indexes - gol_train_indexes
-  save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
+  save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies)
 
   save_np(eval_datas, "eval_datas")
   save_np(gen_boards, "gen_boards")
