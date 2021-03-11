@@ -8,7 +8,6 @@ import tensorflow as tf
 from absl import app
 from train.data_functions import plt_data
 
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string('job_dir', '',

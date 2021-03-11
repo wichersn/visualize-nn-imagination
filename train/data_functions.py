@@ -15,8 +15,14 @@ def life_step(X):
 
 
 def num_black_cells(X):
+  # X is [batch_size, timesteps, board_size, board_size, 1] and val is [batch_size, timesteps, 1]
   val = tf.expand_dims(tf.reduce_sum(X, axis=(-1, -2, -3)), 2)
   return val / (FLAGS.board_size ** 2)
+
+def num_black_cells_in_patch(X):
+  # X is [batch_size, timesteps, board_size, board_size, 1] and targets is same dims as X
+  targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG', padding='SAME')
+  return targets
 
 
 def convert_model_in(data):
