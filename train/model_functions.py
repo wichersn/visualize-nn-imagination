@@ -5,11 +5,13 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('job_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_string('model_save_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
+flags.DEFINE_integer('adver_decoder_layers', 2, '')
 flags.DEFINE_integer('decoder_counter_layers', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('use_residual', 1, '')
@@ -47,7 +49,7 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   return decoder
 
 def get_save_path(name):
-  return os.path.join(FLAGS.job_dir, name+"_ckpt", 'ckpt')
+  return os.path.join(FLAGS.model_save_dir, name+"_ckpt", 'ckpt')
 
 def save_model(model, name):
   model.save_weights(get_save_path(name))
@@ -111,7 +113,7 @@ def create_models():
       ], name="discriminator",
   )
 
-  adver_decoder = get_stop_grad_dec(FLAGS.decoder_layers, "adver_decoder")
+  adver_decoder = get_stop_grad_dec(FLAGS.adver_decoder_layers, "adver_decoder")
 
   maybe_load_model(encoder, 'encoder')
   maybe_load_model(decoder, 'decoder')
