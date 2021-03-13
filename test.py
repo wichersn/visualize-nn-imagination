@@ -13,7 +13,7 @@ non_train_indexies = [1,2,3]
 class MetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
-        self.metric_test_eval_datas = gen_data_batch(2000, 4)
+        self.metric_test_eval_datas = gen_data_batch(200, 4)
 
     def metric_asserts(self, eval_datas, gen_boards, expected_min, expected_max):
         metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
@@ -32,14 +32,14 @@ class MetricTestCase(unittest.TestCase):
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 2],
              self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 4]], axis=1)
         # It should get less than 1 since 2 states are the same
-        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .65, .90)
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .8, .9)
 
     def test_no_credit_for_start_or_end_state(self):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
-        # It should get close to 0
-        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .0, .4)
+        # It should get much lower than 1
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .4, .5)
 
     def test_combine_metric_works(self):
         metric_test_gen_datas = np.stack(

@@ -13,29 +13,22 @@ def single_index_metric(gt, gen):
 
   return np.mean(mccs)
 
+def single_gt_index_metric(gt, gen_boards, non_train_indexies):
+  """Metric representing how well the gen boards represent the single ground truth state.
 
-def single_gen_index_metric(gt_boards, gen, non_train_indexies):
-  """Metric representing how well a single generated state matches the true states.
-  Only counts the true states that match the best
+  It gets credit for only the generated state it matches the best.
   """
   metrics_for_gt = []
   for j in non_train_indexies:
-    metrics_for_gt.append(single_index_metric(gt_boards[:, j], gen))
-  return max(metrics_for_gt), np.argmax(metrics_for_gt)
-
+    metrics_for_gt.append(single_index_metric(gt, gen_boards[:, j]))
+  return np.max(metrics_for_gt)  
 
 def visualize_metric(eval_datas, gen_boards, non_train_indexies):
-  """Averages the metric on each of the generated states. Each generated states is matched to a unique true state"""
+  """Averages the metric on each of the ground truth states."""
   total_metric = 0
-  used_idxs = []
   for i in non_train_indexies:
-    metric_val, idx = single_gen_index_metric(eval_datas, gen_boards[:, i], non_train_indexies)
-    if idx not in used_idxs:
-      total_metric += metric_val
-      used_idxs.append(idx)
-
+    total_metric += single_gt_index_metric(eval_datas[:, i], gen_boards, non_train_indexies)
   return total_metric / float(len(non_train_indexies))
-
 
 def combine_metric(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
   adver_metric = visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
