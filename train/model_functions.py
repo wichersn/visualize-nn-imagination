@@ -1,3 +1,17 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import tensorflow as tf
 from absl import flags
 
@@ -43,6 +57,24 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   print(name, decoder.layers)
   return decoder
 
+def create_count_decoder():
+  decoder_counter = tf.keras.Sequential(name="decoder-counter")
+  add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
+  decoder_counter.add(tf.keras.layers.Flatten())
+  decoder_counter.add(tf.keras.layers.Dense(1))
+  print("decoder_counter", decoder_counter.layers)
+  return decoder_counter
+
+def create_gol_decoder():
+  decoder = tf.keras.Sequential(name="decoder")
+  add_decoder_layers(decoder, FLAGS.decoder_layers)
+  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  print("decoder", decoder.layers)
+  return decoder
+
+def create_patch_decoder():
+  return create_gol_decoder()
+
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)
@@ -66,17 +98,6 @@ def create_models():
       timestep += intermediates[-1]
     intermediates.append(timestep)
 
-  decoder = tf.keras.Sequential(name="decoder")
-  add_decoder_layers(decoder, FLAGS.decoder_layers)
-  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("decoder", decoder.layers)
-
-  decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
-  decoder_counter.add(tf.keras.layers.Flatten())
-  decoder_counter.add(tf.keras.layers.Dense(1))
-  print("decoder_counter", decoder_counter.layers)
-
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
 
   discriminator = tf.keras.Sequential(
@@ -97,4 +118,4 @@ def create_models():
 
   adver_decoder = get_stop_grad_dec(FLAGS.decoder_layers, "adver_decoder")
 
-  return encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator
+  return encoder, intermediates, adver_decoder, model, discriminator
