@@ -25,6 +25,10 @@ trainingInput:
     maxTrials: 20
     maxParallelTrials: 5
     params:
+      - parameterName: task
+        type: CATEGORICAL
+        categoricalValues: ['gol']
+
       - parameterName: use_autoencoder
         type: INTEGER
         minValue: 1
@@ -33,14 +37,14 @@ trainingInput:
 
       - parameterName: game_timesteps
         type: INTEGER
-        minValue: 2
-        maxValue: 2
+        minValue: 3
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: model_timesteps
         type: INTEGER
-        minValue: 3
-        maxValue: 3
+        minValue: 2
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoder_layers
