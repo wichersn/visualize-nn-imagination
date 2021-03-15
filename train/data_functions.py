@@ -21,6 +21,7 @@ import io
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('board_size', 20, '')
+flags.DEFINE_float('random_board_prob', .1, '')
 
 def life_step(X):
     nbrs_count = convolve2d(X, np.ones((3, 3)), mode='same', boundary='fill') - X
@@ -47,15 +48,20 @@ def convert_model_in(data):
 
 def gen_data_batch(size, skip):
   datas = []
-  initial_life_states = np.random.rand(size, FLAGS.board_size, FLAGS.board_size) > .5
+  start_next = None
+  for _ in range(size):
+    if np.random.rand(1) < FLAGS.random_board_prob or start_next is None:
+      life_state = np.random.rand(FLAGS.board_size, FLAGS.board_size) > .5
+    else:
+      life_state = start_next
 
-  for i in range(size):
     data = []
-    life_state = initial_life_states[i]
     data.append(life_state)
-    for _ in range(skip):
+    for i in range(skip):
       life_state = life_step(life_state)
       data.append(life_state)
+      if i == 0:
+        start_next = life_state
     datas.append(data)
 
   datas = convert_model_in(datas)
