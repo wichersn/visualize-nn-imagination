@@ -22,13 +22,14 @@ from train.data_functions import num_black_cells, gen_data_batch, get_batch
 
 from absl import flags
 FLAGS = flags.FLAGS
+FLAGS.random_board_prob = 1.0
 
 non_train_indexies = [1,2,3]
 
 class MetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
-        self.metric_test_eval_datas = gen_data_batch(200, 4)
+        self.metric_test_eval_datas = gen_data_batch(500, 4)
 
     def metric_asserts(self, eval_datas, gen_boards, expected_min, expected_max, non_train_indexies):
         metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
@@ -102,22 +103,22 @@ class MetricTestCase(unittest.TestCase):
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1],
              self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3]], axis=1)
         eval_datas = self.metric_test_eval_datas
-        # expected score: (1+1+0) / 3 = .666
-        self.metric_asserts(eval_datas, gen_boards, .666, .8, [1,2])
+        # expected score: (1+1+0) / 2 = 1.0
+        self.metric_asserts(eval_datas, gen_boards, 1.0, 1.2, [1,2])
 
     def test_game4_model3_steps_2(self):
         gen_boards = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 3],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
         eval_datas = self.metric_test_eval_datas
-        # expected score: (0+1+0) / 3 = .333
-        self.metric_asserts(eval_datas, gen_boards, .333, .52, [1,2])
+        # expected score: (0+1+0) / 2 = .5
+        self.metric_asserts(eval_datas, gen_boards, .54, .8, [1,2])
 
     def test_game3_model2_steps(self):
         gen_boards = np.stack(
-            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 2]], axis=1)
+            [self.metric_test_eval_datas[:, 0], np.zeros_like(self.metric_test_eval_datas[:, 4]), self.metric_test_eval_datas[:, 4]], axis=1)
         eval_datas = self.metric_test_eval_datas[:, :4]
-        # expected score: (0+0) / 2 = .0
+        # expected score: (0+0) / 1 = .0
         self.metric_asserts(eval_datas, gen_boards, .0, .37, [1])
 
 class AccuracyInverseMetricTestCase(unittest.TestCase):

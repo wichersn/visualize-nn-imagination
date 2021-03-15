@@ -35,7 +35,7 @@ gcloud ai-platform jobs submit training $JOB_NAME \
   --project $PROJECT_ID \
   --package-path train/ \
   --module-name train.train \
-  --region australia-southeast1	\
+  --region europe-west1	\
   --python-version 3.7 \
   --runtime-version 2.2 \
   --job-dir $JOB_DIR \

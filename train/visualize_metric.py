@@ -45,7 +45,7 @@ def visualize_metric(eval_datas, gen_boards, non_train_indexies):
   total_metric = 0
   for game_i in game_non_train_indexes:
     total_metric += single_gt_index_metric(eval_datas[:, game_i], gen_boards, non_train_indexies)
-  return total_metric / len(game_non_train_indexes) # float(min(len(non_train_indexies), len(game_non_train_indexes)))
+  return total_metric / float(min(len(non_train_indexies), len(game_non_train_indexes)))
 
 def combine_metric(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
   adver_metric = visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
