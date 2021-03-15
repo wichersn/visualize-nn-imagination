@@ -26,22 +26,36 @@ non_train_indexies = [1,2,3]
 
 class MetricTestCase(unittest.TestCase):
     def setUp(self):
+        """[summary]
+        """        
         FLAGS(['test'])
         self.metric_test_eval_datas = gen_data_batch(200, 4)
 
     def metric_asserts(self, eval_datas, gen_boards, expected_min, expected_max):
+        """[summary]
+
+        Args:
+            eval_datas ([type]): [description]
+            gen_boards ([type]): [description]
+            expected_min ([type]): [description]
+            expected_max ([type]): [description]
+        """        
         metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
 
         self.assertGreaterEqual(metric_val, expected_min)
         self.assertLessEqual(metric_val, expected_max)
 
     def test_same_data_should_be_1_even_when_reordered(self):
+        """[summary]
+        """        
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3],
              self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 4]], axis=1)
         self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, 1, 1.1)
 
     def test_only_gets_partial_credit_if_repeating_same_state(self):
+        """[summary]
+        """        
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 2],
              self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 4]], axis=1)
@@ -49,6 +63,8 @@ class MetricTestCase(unittest.TestCase):
         self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .8, .9)
 
     def test_no_credit_for_start_or_end_state(self):
+        """[summary]
+        """        
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
@@ -56,6 +72,8 @@ class MetricTestCase(unittest.TestCase):
         self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .4, .5)
 
     def test_combine_metric_works(self):
+        """[summary]
+        """        
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
@@ -66,9 +84,13 @@ class MetricTestCase(unittest.TestCase):
 
 class AccuracyInverseMetricTestCase(unittest.TestCase):
     def setUp(self):
+        """[summary]
+        """        
         FLAGS(['test'])
 
     def test(self):
+        """[summary]
+        """        
       metric = AccuracyInverseMetric(FLAGS.board_size)
       y_pred = np.array([21.3, 10.6, 70.8, 90, 35.2]) / (FLAGS.board_size **2)
       y_true = np.array([21, 10, 70, 97, 35]) / (FLAGS.board_size **2)

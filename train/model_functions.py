@@ -30,6 +30,14 @@ flags.DEFINE_float('dropout_rate', 0.0, '')
 leak_relu = tf.keras.layers.LeakyReLU
 
 def create_timestep_model(name=''):
+  """[summary]
+
+  Args:
+      name (str, optional): [description]. Defaults to ''.
+
+  Returns:
+      [type]: [description]
+  """  
   timestep_model = tf.keras.Sequential(name="timestep_model"+name)
   for _ in range(FLAGS.timestep_layers):
     timestep_model.add(tf.keras.layers.Conv2D(FLAGS.encoded_size, 3, activation=leak_relu(), padding='same',
@@ -39,6 +47,13 @@ def create_timestep_model(name=''):
   return timestep_model
 
 def add_decoder_layers(decoder, decoder_layers, encoded_size=None):
+  """[summary]
+
+  Args:
+      decoder ([type]): [description]
+      decoder_layers ([type]): [description]
+      encoded_size ([type], optional): [description]. Defaults to None.
+  """  
   if not encoded_size:
     encoded_size = FLAGS.encoded_size
   for _ in range(decoder_layers-1):
@@ -58,6 +73,11 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   return decoder
 
 def create_count_decoder():
+  """[summary]
+
+  Returns:
+      [type]: [description]
+  """  
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
   add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
   decoder_counter.add(tf.keras.layers.Flatten())
@@ -66,6 +86,11 @@ def create_count_decoder():
   return decoder_counter
 
 def create_gol_decoder():
+  """[summary]
+
+  Returns:
+      [type]: [description]
+  """  
   decoder = tf.keras.Sequential(name="decoder")
   add_decoder_layers(decoder, FLAGS.decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
@@ -73,9 +98,19 @@ def create_gol_decoder():
   return decoder
 
 def create_patch_decoder():
+  """[summary]
+
+  Returns:
+      [type]: [description]
+  """  
   return create_gol_decoder()
 
 def create_models():
+  """[summary]
+
+  Returns:
+      [type]: [description]
+  """  
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)
 

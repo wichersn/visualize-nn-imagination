@@ -30,6 +30,14 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 flags.DEFINE_bool('is_hp_serach_root', False, '')
 
 def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
+    """[summary]
+
+    Args:
+        saved_array_dir ([type]): [description]
+        ouput_dir ([type]): [description]
+        input_array_names ([type]): [description]
+        num_to_save ([type]): [description]
+    """    
     datas = {}
 
     for name in input_array_names:
@@ -54,6 +62,11 @@ def save_imgs(saved_array_dir, ouput_dir, input_array_names, num_to_save):
         plt.close('all')
 
 def main(_):
+    """[summary]
+
+    Args:
+        _ ([type]): [description]
+    """    
     input_array_names = {"eval_datas": "Ground Truth",
                "gen_boards": "Inferred",
                "adver_gen_boards": "Inferred with adver loss",

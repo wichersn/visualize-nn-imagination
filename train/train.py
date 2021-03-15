@@ -49,6 +49,23 @@ flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
+  """[summary]
+
+  Args:
+      task_infos ([type]): [description]
+      model ([type]): [description]
+      encoder ([type]): [description]
+      datas ([type]): [description]
+      discriminator ([type]): [description]
+      should_train_model ([type]): [description]
+      adversarial_task_name ([type]): [description]
+      metric_stop_task_name ([type]): [description]
+      metric_prefix ([type]): [description]
+      max_train_steps ([type], optional): [description]. Defaults to None.
+
+  Returns:
+      [type]: [description]
+  """  
   """This training function was designed to be flexible to work with a variety of tasks.
 
   @ param task_infos: A list of dicts. Each dict specifies the parameters of a task. Keys:
@@ -97,6 +114,15 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
   discriminator_opt = tf.keras.optimizers.Adam()
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
+    """[summary]
+
+    Args:
+        discrim_on_real ([type]): [description]
+        discrim_on_gen ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """    
     real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
     discrim_acc_metric.update_state(tf.ones_like(discrim_on_real), discrim_on_real)
 
@@ -106,6 +132,12 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
     return total_loss
 
   def save_image_summary(batch, step_i):
+    """[summary]
+
+    Args:
+        batch ([type]): [description]
+        step_i ([type]): [description]
+    """    
     num_display_imgs = 3
     model_results = model(batch[:num_display_imgs, 0])
     gen_boards = get_gens(task_infos[0]['decoder'], model_results, True)
@@ -116,6 +148,12 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
 
   @tf.function
   def train_step(batch, adver_batch):
+    """[summary]
+
+    Args:
+        batch ([type]): [description]
+        adver_batch ([type]): [description]
+    """    
     inputs_batch = batch[:, 0]
     with tf.GradientTape() as tape, tf.GradientTape() as disc_tape:
       discriminator_loss = 0.0
@@ -215,6 +253,16 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
   return train_full
 
 def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
+  """[summary]
+
+  Args:
+      task_infos ([type]): [description]
+      metric_stop_task_name ([type]): [description]
+      target_val_name ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """  
   for task_info in task_infos:
     if metric_stop_task_name == task_info["name"]:
       metric_stop_task = task_info
@@ -244,12 +292,26 @@ loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0
 mse_loss = tf.keras.losses.MeanSquaredError()
 
 def save_metric_result(metric_result, metric_name):
+  """[summary]
+
+  Args:
+      metric_result ([type]): [description]
+      metric_name ([type]): [description]
+  """  
   writer = tf.summary.create_file_writer(FLAGS.job_dir)
   with writer.as_default():
     tf.summary.scalar(metric_name, metric_result, step=0)
   writer.flush()
 
 def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
+  """[summary]
+
+  Args:
+      eval_datas ([type]): [description]
+      gen_boards ([type]): [description]
+      adver_gen_boards ([type]): [description]
+      non_train_indexies ([type]): [description]
+  """  
   adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
   regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
   save_metric_result(adver_metric, "adver_metric_result")
@@ -258,32 +320,76 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
 
 class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
+    """[summary]
+
+    Returns:
+        [type]: [description]
+    """    
     return 1 - super().result()
 
 class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
   """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
   patch_size = 1
   def __init__(self, patch_size):
+    """[summary]
+
+    Args:
+        patch_size ([type]): [description]
+    """    
     self.patch_size = patch_size
     super().__init__()
 
   def convert_y(self, y):
+    """[summary]
+
+    Args:
+        y ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """    
     return tf.math.round(y * (self.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
+    """[summary]
+
+    Args:
+        y_true ([type]): [description]
+        y_pred ([type]): [description]
+        sample_weight ([type], optional): [description]. Defaults to None.
+
+    Returns:
+        [type]: [description]
+    """    
     y_true = self.convert_y(y_true)
     y_pred = self.convert_y(y_pred)
 
     return super().update_state(y_true, y_pred, sample_weight)
 
   def result(self):
+    """[summary]
+
+    Returns:
+        [type]: [description]
+    """    
     return 1 - super().result()
 
 def save_np(data, name):
+  """[summary]
+
+  Args:
+      data ([type]): [description]
+      name ([type]): [description]
+  """  
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
     np.save(file, data)
 
 def main(_):
+  """[summary]
+
+  Args:
+      _ ([type]): [description]
+  """  
   datas = gen_data_batch(200000, FLAGS.num_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.num_timesteps)
   encoder, intermediates, adver_decoder, model, discriminator = create_models()
@@ -363,6 +469,12 @@ def main(_):
 
 
   def fine_tune_new_decoder(train_indexes, name):
+    """[summary]
+
+    Args:
+        train_indexes ([type]): [description]
+        name ([type]): [description]
+    """    
     print("Train decoder {}".format(name))
     task_infos[0]["train_indexes"] = train_indexes
     task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)

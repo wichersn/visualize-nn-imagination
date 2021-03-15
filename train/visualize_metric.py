@@ -17,6 +17,15 @@ from sklearn.metrics import matthews_corrcoef
 
 
 def single_index_metric(gt, gen):
+  """[summary]
+
+  Args:
+      gt ([type]): [description]
+      gen ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """  
   """Returns the average absolute value of the matthews correlation coefficient(MCC) between generated and true states
   0 is no correlation, 1 is perfect
   """
@@ -28,6 +37,16 @@ def single_index_metric(gt, gen):
   return np.mean(mccs)
 
 def single_gt_index_metric(gt, gen_boards, non_train_indexies):
+  """[summary]
+
+  Args:
+      gt ([type]): [description]
+      gen_boards ([type]): [description]
+      non_train_indexies ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """  
   """Metric representing how well the gen boards represent the single ground truth state.
 
   It gets credit for only the generated state it matches the best.
@@ -38,6 +57,16 @@ def single_gt_index_metric(gt, gen_boards, non_train_indexies):
   return np.max(metrics_for_gt)  
 
 def visualize_metric(eval_datas, gen_boards, non_train_indexies):
+  """[summary]
+
+  Args:
+      eval_datas ([type]): [description]
+      gen_boards ([type]): [description]
+      non_train_indexies ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """  
   """Averages the metric on each of the ground truth states."""
   total_metric = 0
   for i in non_train_indexies:
@@ -45,6 +74,17 @@ def visualize_metric(eval_datas, gen_boards, non_train_indexies):
   return total_metric / float(len(non_train_indexies))
 
 def combine_metric(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
+  """[summary]
+
+  Args:
+      eval_datas ([type]): [description]
+      gen_boards ([type]): [description]
+      adver_gen_boards ([type]): [description]
+      non_train_indexies ([type]): [description]
+
+  Returns:
+      [type]: [description]
+  """  
   adver_metric = visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
   regular_metric = visualize_metric(eval_datas, gen_boards, non_train_indexies)
   return max(adver_metric, regular_metric)
