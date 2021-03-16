@@ -21,3 +21,5 @@ Download them with
 
     gsutil cp -r gs://visualize-nn-imagination-runs/cc_count2ts_dec_enc_fix_8335585/imgs/* /Users/wichersn/visualize_nn_runs/cc_count2ts_dec_enc_fix_8335585
     
+# Disclaimer
+This is not an officially supported Google product
