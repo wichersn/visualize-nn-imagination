@@ -21,6 +21,7 @@ def single_index_metric(gt, gen):
   0 is no correlation, 1 is perfect
   """
   if (gt == gen).all():
+    # matthews_corrcoef will return .5 if both gt and gen are all 0s or 1s.
     return 1.0
 
   mccs = matthews_corrcoef(gt.flatten(), gen.flatten() > .5)
