@@ -75,20 +75,25 @@ def get_batch(datas, batch_size):
 def plt_boards(boards, axes, pos):
   for i in range(len(boards)):
     axes[pos, i].imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
+  for i in range(axes.shape[1]):
     axes[pos, i].axis('off')
 
 def plt_data(datas):
+    # datas: {"gt": [num_display_imgs, game_timesteps, ...], "p": [num_display_imgs, model_timesteps, ...]}
+    max_timesteps = 0
+    for data in datas.values():
+        max_timesteps = max(data.shape[1], max_timesteps)
+
     one_datas = list(datas.values())[0]
     figs = []
     for i in range(len(one_datas)):
-        fig, axes = plt.subplots(len(datas), len(one_datas[i]))
+        fig, axes = plt.subplots(len(datas), max_timesteps)
         for pos, name in enumerate(datas):
             plt_boards(datas[name][i], axes, pos)
         figs.append(fig)
     return figs
 
 def fig_to_image(fig):
-  DPI = 100
   io_buf = io.BytesIO()
   fig.savefig(io_buf, format='png')
   io_buf.seek(0)

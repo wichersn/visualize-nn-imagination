@@ -25,13 +25,19 @@ trainingInput:
     maxTrials: 20
     maxParallelTrials: 5
     params:
-      - parameterName: count_cells
+      - parameterName: task
+        type: CATEGORICAL
+        categoricalValues: ['count_cells']
+
+
+
+      - parameterName: game_timesteps
         type: INTEGER
         minValue: 1
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: num_timesteps
+      - parameterName: model_timesteps
         type: INTEGER
         minValue: 1
         maxValue: 1

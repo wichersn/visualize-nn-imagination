@@ -19,17 +19,19 @@ from train.train import AccuracyInverseMetric
 import numpy as np
 from train.data_functions import num_black_cells, gen_data_batch, get_batch
 
+
 from absl import flags
 FLAGS = flags.FLAGS
+FLAGS.random_board_prob = 1.0
 
 non_train_indexies = [1,2,3]
 
 class MetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
-        self.metric_test_eval_datas = gen_data_batch(200, 4)
+        self.metric_test_eval_datas = gen_data_batch(500, 4)
 
-    def metric_asserts(self, eval_datas, gen_boards, expected_min, expected_max):
+    def metric_asserts(self, eval_datas, gen_boards, expected_min, expected_max, non_train_indexies):
         metric_val = visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
 
         self.assertGreaterEqual(metric_val, expected_min)
@@ -39,21 +41,36 @@ class MetricTestCase(unittest.TestCase):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3],
              self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 4]], axis=1)
-        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, 1, 1.1)
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .999, 1.01, non_train_indexies)
 
-    def test_only_gets_partial_credit_if_repeating_same_state(self):
+    def test_no_credit_repeating_same_state(self):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 2],
-             self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 4]], axis=1)
-        # It should get less than 1 since 2 states are the same
-        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .8, .9)
+             self.metric_test_eval_datas[:, 1], self.metric_test_eval_datas[:, 4]], axis=1)
+        # (1+1+0) / 3
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .666, .8, non_train_indexies)
+
+    def test_repeating_first_state(self):
+        metric_test_gen_datas = np.stack(
+            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0],
+             self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0]], axis=1)
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .0, .07, non_train_indexies)
+
+    def test_all_zeros(self):
+        self.metric_asserts(np.zeros_like(self.metric_test_eval_datas), np.zeros_like(self.metric_test_eval_datas), .999, 1.01, non_train_indexies)
+
+    def test_all_ones(self):
+        self.metric_asserts(np.ones_like(self.metric_test_eval_datas), np.ones_like(self.metric_test_eval_datas), .999, 1.01, non_train_indexies)
+
+    def test_gen_zeros(self):
+        self.metric_asserts(np.zeros_like(self.metric_test_eval_datas), self.metric_test_eval_datas, .0, .01, non_train_indexies)
 
     def test_no_credit_for_start_or_end_state(self):
         metric_test_gen_datas = np.stack(
             [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0],
              self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
-        # It should get much lower than 1
-        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .4, .5)
+        # It should be around 0
+        self.metric_asserts(self.metric_test_eval_datas, metric_test_gen_datas, .0, .3, non_train_indexies)
 
     def test_combine_metric_works(self):
         metric_test_gen_datas = np.stack(
@@ -63,6 +80,46 @@ class MetricTestCase(unittest.TestCase):
         print(combine_val)
         self.assertGreaterEqual(combine_val, 1)
         self.assertLessEqual(combine_val, 1.1)
+
+    def test_game3_model4_steps(self):
+        gen_boards = np.stack(
+            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1],
+             self.metric_test_eval_datas[:, 1],
+             self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3]], axis=1)
+        eval_datas = self.metric_test_eval_datas[:, :4]
+        self.metric_asserts(eval_datas, gen_boards, .99, 1.01, non_train_indexies)
+
+    def test_game3_model4_steps2(self):
+        gen_boards = np.stack(
+            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 0],
+             self.metric_test_eval_datas[:, 3],
+             self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3]], axis=1)
+        eval_datas = self.metric_test_eval_datas[:, :4]
+        # expected score: (1+0) / 2 = .5
+        self.metric_asserts(eval_datas, gen_boards, .5, .67, non_train_indexies)
+
+    def test_game4_model3_steps(self):
+        gen_boards = np.stack(
+            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 1],
+             self.metric_test_eval_datas[:, 2], self.metric_test_eval_datas[:, 3]], axis=1)
+        eval_datas = self.metric_test_eval_datas
+        # expected score: (1+1+0) / 2 = 1.0
+        self.metric_asserts(eval_datas, gen_boards, 1.0, 1.2, [1,2])
+
+    def test_game4_model3_steps_2(self):
+        gen_boards = np.stack(
+            [self.metric_test_eval_datas[:, 0], self.metric_test_eval_datas[:, 3],
+             self.metric_test_eval_datas[:, 4], self.metric_test_eval_datas[:, 4]], axis=1)
+        eval_datas = self.metric_test_eval_datas
+        # expected score: (0+1+0) / 2 = .5
+        self.metric_asserts(eval_datas, gen_boards, .54, .8, [1,2])
+
+    def test_game3_model2_steps(self):
+        gen_boards = np.stack(
+            [self.metric_test_eval_datas[:, 0], np.zeros_like(self.metric_test_eval_datas[:, 4]), self.metric_test_eval_datas[:, 4]], axis=1)
+        eval_datas = self.metric_test_eval_datas[:, :4]
+        # expected score: (0+0) / 1 = .0
+        self.metric_asserts(eval_datas, gen_boards, .0, .37, [1])
 
 class AccuracyInverseMetricTestCase(unittest.TestCase):
     def setUp(self):

@@ -28,8 +28,14 @@ trainingInput:
       - parameterName: task
         type: CATEGORICAL
         categoricalValues: ['count_cells']
-        
-      - parameterName: num_timesteps
+
+      - parameterName: game_timesteps
+        type: INTEGER
+        minValue: 2
+        maxValue: 2
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: model_timesteps
         type: INTEGER
         minValue: 2
         maxValue: 2

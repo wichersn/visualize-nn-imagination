@@ -30,11 +30,12 @@ PROJECT_ID=visualize-nn-imagination
 JOB_DIR=gs://$BUCKET_ID/$JOB_NAME
 
 # Have extra quota in us-west1, us-central1, asia-east1
+# australia-southeast1, europe-west1, us-east1, europe-west4
 gcloud ai-platform jobs submit training $JOB_NAME \
   --project $PROJECT_ID \
   --package-path train/ \
   --module-name train.train \
-  --region asia-east1	\
+  --region europe-west1	\
   --python-version 3.7 \
   --runtime-version 2.2 \
   --job-dir $JOB_DIR \
