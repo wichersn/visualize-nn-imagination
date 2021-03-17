@@ -7,6 +7,8 @@ You might have to change the `--region` flag in `launch_cloud` to get it to sche
 # Train local
      python3 -m train.train --job_dir something
      
+The models and flagfile are saved after regular training and before adversarial training. 
+
 # Tensorboard
 Replace these paths with the ones you want to see
 
