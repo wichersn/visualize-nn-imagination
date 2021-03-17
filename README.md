@@ -1,6 +1,6 @@
 # Launch on cloud
     chmod +x launch_cloud.sh
-    ./launch_cloud.sh job_name
+    ./launch_cloud.sh cc_3ts.yaml job_name
     
 You might have to change the `--region` flag in `launch_cloud` to get it to schedule. Sometimes jobs stay `Queued` for 10 hours. See [here](https://cloud.google.com/compute/docs/gpus) for regions with p100s or whatever gpu type is in `cloud_config.yaml`
     
@@ -22,3 +22,6 @@ Download them with
     gsutil cp -r gs://visualize-nn-imagination-runs/cc_count2ts_dec_enc_fix_8335585/imgs/* /Users/wichersn/visualize_nn_runs/cc_count2ts_dec_enc_fix_8335585
     
 gsutil cp -r gs://visualize-nn-imagination-runs/cc_different_ts_game3_model2_save_9933351/9 /Users/wichersn/visualize_nn_runs/cc_different_ts_game3_model2_save_9933351/9
+
+# Disclaimer
+This is not an officially supported Google product

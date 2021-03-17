@@ -1,3 +1,17 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import numpy as np
 import tensorflow as tf
 from absl import app
@@ -5,16 +19,16 @@ from absl import flags
 import os
 
 import train.visualize_metric
-from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, fig_to_image
-from train.model_functions import create_models, get_stop_grad_dec, save_model
-
+from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, fig_to_image, plt_data
+from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder, save_model
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('game_timesteps', 2, '')
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_integer('count_cells', 0, '')
+flags.DEFINE_string('task', 'patch', 'gol or count_cells or patch')
+flags.DEFINE_integer('patch_size', 1, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
@@ -179,6 +193,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
 
       train_step(tf.constant(batch), tf.constant(adver_batch), tf.constant(step_i))
 
+
       if step_i == FLAGS.early_stop_step:
         task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
         if not task_good_enough:
@@ -239,9 +254,9 @@ def save_metric_result(metric_result, metric_name):
     tf.summary.scalar(metric_name, metric_result, step=0)
   writer.flush()
 
-def save_metrics(eval_datas, gen_boards, adver_gen_boards, thresh, non_train_indexies):
-  adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, thresh, non_train_indexies)
-  regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, thresh, non_train_indexies)
+def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
+  adver_metric = train.visualize_metric.visualize_metric(eval_datas, adver_gen_boards, non_train_indexies)
+  regular_metric = train.visualize_metric.visualize_metric(eval_datas, gen_boards, non_train_indexies)
   save_metric_result(adver_metric, "adver_metric_result")
   save_metric_result(regular_metric, "regular_metric_result")
   save_metric_result(max(regular_metric, adver_metric), "final_metric_result")
@@ -250,10 +265,15 @@ class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
   def result(self):
     return 1 - super().result()
 
-class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
-  """Gives 1- the accuracy whe the prediction is rounded to the nearest integer."""
+class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
+  """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
+  patch_size = 1
+  def __init__(self, patch_size):
+    self.patch_size = patch_size
+    super().__init__()
+
   def convert_y(self, y):
-    return tf.math.round(y * (FLAGS.board_size ** 2))
+    return tf.math.round(y * (self.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
     y_true = self.convert_y(y_true)
@@ -264,7 +284,6 @@ class CountAccuracyInverseMetric(tf.keras.metrics.Accuracy):
   def result(self):
     return 1 - super().result()
 
-
 def save_np(data, name):
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, name), 'wb') as file:
     np.save(file, data)
@@ -272,32 +291,40 @@ def save_np(data, name):
 def main(_):
   datas = gen_data_batch(200000, FLAGS.game_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.game_timesteps)
-  encoder, intermediates, decoder, adver_decoder, decoder_counter, model, discriminator = create_models()
+  encoder, intermediates, adver_decoder, model, discriminator = create_models()
+  decoder = create_gol_decoder()
+  decoder_counter = create_count_decoder()
+  decoder_patch = create_patch_decoder()
 
-  board_train_indexes = set()
+  gol_train_indexes = set()
   if FLAGS.use_autoencoder:
-    board_train_indexes.add(0)
-  if not FLAGS.count_cells:
-    board_train_indexes.add(FLAGS.model_timesteps)
+    gol_train_indexes.add(0)
+  if FLAGS.task == 'gol':
+    gol_train_indexes.add(FLAGS.model_timesteps)
 
-  count_train_indexes = set()
+  task_train_indexes = set()
   if FLAGS.use_task_autoencoder:
-    count_train_indexes.add(0)
-  count_train_indexes.add(FLAGS.model_timesteps)
+    task_train_indexes.add(0)
+  task_train_indexes.add(FLAGS.model_timesteps)
 
-  if FLAGS.count_cells:
+  if FLAGS.task == 'count_cells':
     metric_stop_task_name = 'count'
   else:
     metric_stop_task_name = 'board'
 
   task_infos = [
-    {'name': 'board', 'train_indexes': board_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
+    {'name': 'board', 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
       'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
-  if FLAGS.count_cells:
+  if FLAGS.task == 'count_cells':
     task_infos.append(
-      {'name': 'count', 'train_indexes': count_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
-      'loss_fn': mse_loss, 'metric_class': CountAccuracyInverseMetric, 'target_metric_val': FLAGS.target_task_metric_val,
+      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
+      'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
+       'early_metric_val': FLAGS.early_task_metric_val})
+  if FLAGS.task == 'patch':
+    task_infos.append(
+      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
+      'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
   print("job_dir", FLAGS.job_dir)
@@ -324,9 +351,9 @@ def main(_):
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
   task_infos[0]['target_metric_val'] = 0.0
   print("task infos adversarial", task_infos)
-  # print("Training Only Decoder", flush=True)
-  # get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-  #                   adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
+  print("Training Only Decoder", flush=True)
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
+                    adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
 
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
@@ -339,14 +366,14 @@ def main(_):
   all_indexes = set(range(FLAGS.model_timesteps+1))
   # Only consider the indexes we train the board on as train indexes.
   # The indexes that count cells is trained on could still be non train indexes
-  non_train_indexies = all_indexes - board_train_indexes
-  save_metrics(eval_datas, gen_boards, adver_gen_boards, .95, non_train_indexies)
+  non_train_indexies = all_indexes - gol_train_indexes
+  save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies)
 
   save_np(eval_datas, "eval_datas")
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
 
-  if FLAGS.count_cells:
+  if FLAGS.task == 'count_cells':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 
