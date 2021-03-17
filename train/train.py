@@ -278,6 +278,9 @@ class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
     return tf.math.round(y * (self.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
+    tf.print("y_true", y_true)
+    tf.print("y_pred", y_pred)
+
     y_true = self.convert_y(y_true)
     y_pred = self.convert_y(y_pred)
 

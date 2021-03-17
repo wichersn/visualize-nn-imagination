@@ -125,12 +125,19 @@ class AccuracyInverseMetricTestCase(unittest.TestCase):
     def setUp(self):
         FLAGS(['test'])
 
-    def test(self):
+    def test_board_size(self):
       metric = AccuracyInverseMetric(FLAGS.board_size)
       y_pred = np.array([21.3, 10.6, 70.8, 90, 35.2]) / (FLAGS.board_size **2)
       y_true = np.array([21, 10, 70, 97, 35]) / (FLAGS.board_size **2)
       metric.update_state(y_true, y_pred)
       self.assertAlmostEqual(1-2/5, metric.result().numpy())
+
+    def test_size_2(self):
+      metric = AccuracyInverseMetric(2)
+      y_pred = np.array([1.49, .51, 1.51, 3.4, 3.4]) / 4.0
+      y_true = np.array([1,     0,  2,    4,   3])  / 4.0
+      metric.update_state(y_true, y_pred)
+      self.assertAlmostEqual(1-3/5, metric.result().numpy())
 
 if __name__ == '__main__':
     unittest.main()
