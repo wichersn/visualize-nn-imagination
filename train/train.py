@@ -22,12 +22,14 @@ import train.visualize_metric
 from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, fig_to_image, plt_data
 from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder
 
+GOL_NAME = 'gol'
+
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('game_timesteps', 2, '')
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_string('task', 'patch', 'gol or count_cells or patch')
+flags.DEFINE_enum('task', 'patch', [GOL_NAME, 'count', 'patch'], '')
 flags.DEFINE_integer('patch_size', 2, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
@@ -47,6 +49,7 @@ flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
 flags.DEFINE_string('job_dir', '',
                     'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
+
 
 def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
@@ -135,7 +138,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           pred = task_info['decoder'](model_outputs[model_i])
 
           flatten_fn = tf.keras.layers.Flatten()
-          if task_info["name"] == 'board' and FLAGS.dec_enc_loss_amount > 1e-20:
+          if task_info["name"] == GOL_NAME and FLAGS.dec_enc_loss_amount > 1e-20:
             pred_enc = encoder(pred)
             dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[model_i]), flatten_fn(pred_enc))) + 1
 
@@ -224,6 +227,7 @@ def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
       metric_stop_task = task_info
 
   metric_index = max(metric_stop_task['train_indexes'])
+  print("Stop metric index", metric_index)
   stop_metric = metric_stop_task['metrics'][metric_index]
 
   metric_result = stop_metric.result().numpy()
@@ -305,16 +309,11 @@ def main(_):
     task_train_indexes.add(0)
   task_train_indexes.add(FLAGS.model_timesteps)
 
-  if FLAGS.task == 'count_cells':
-    metric_stop_task_name = 'count'
-  else:
-    metric_stop_task_name = 'board'
-
   task_infos = [
-    {'name': 'board', 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
+    {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
       'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
-  if FLAGS.task == 'count_cells':
+  if FLAGS.task == 'count':
     task_infos.append(
       {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
@@ -328,9 +327,9 @@ def main(_):
   print("task_infos", task_infos, flush=True)
   print("Full model training")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
-                    adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
+                    adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
 
-  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
@@ -340,11 +339,11 @@ def main(_):
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
+                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder')()
 
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
+                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial')()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gens(decoder, model_results, True)
@@ -360,7 +359,7 @@ def main(_):
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
 
-  if FLAGS.task == 'count_cells':
+  if FLAGS.task == 'count':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 
@@ -372,7 +371,7 @@ def main(_):
   #     task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
   #     print("task infos", task_infos)
   #     get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-  #                       adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+  #                       adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_{}'.format(name),
   #                     max_train_steps=int(FLAGS.max_train_steps/10))()
   #     new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
   #     save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
