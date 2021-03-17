@@ -20,7 +20,7 @@ import os
 
 import train.visualize_metric
 from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, fig_to_image, plt_data
-from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder
+from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder, save_model
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('game_timesteps', 2, '')
@@ -43,9 +43,8 @@ flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
+flags.DEFINE_float('adver_weight', 1.0, '')
 
-flags.DEFINE_string('job_dir', '',
-                    'Root directory for writing logs/summaries/checkpoints.')
 flags.DEFINE_alias('job-dir', 'job_dir')
 
 def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
@@ -116,7 +115,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
     tf.summary.image(metric_prefix, display_img, step=step_i, max_outputs=num_display_imgs)
 
   @tf.function
-  def train_step(batch, adver_batch):
+  def train_step(batch, adver_batch, step_i):
     inputs_batch = batch[:, 0]
     with tf.GradientTape() as tape, tf.GradientTape() as disc_tape:
       discriminator_loss = 0.0
@@ -153,7 +152,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
             discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
             generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
             gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
-            loss += generator_loss
+            loss += generator_loss * FLAGS.adver_weight
             ran_discrim = True
 
       reg_loss = sum(model.losses)
@@ -192,7 +191,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       batch = get_batch(datas, FLAGS.batch_size)
       adver_batch = get_batch(datas, FLAGS.batch_size)
 
-      train_step(tf.constant(batch), tf.constant(adver_batch))
+      train_step(tf.constant(batch), tf.constant(adver_batch), tf.constant(step_i))
 
 
       if step_i == FLAGS.early_stop_step:
@@ -328,6 +327,9 @@ def main(_):
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
+  with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'w') as out_file:
+    out_file.write(FLAGS.flags_into_string())
+
   print("task_infos", task_infos, flush=True)
   print("Full model training")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
@@ -337,6 +339,14 @@ def main(_):
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
+
+  save_model(encoder, 'encoder')
+  save_model(decoder, 'decoder')
+  save_model(model, 'model')
+  if FLAGS.task == 'count_cells':
+    save_model(decoder_counter, 'decoder_counter')
+  if FLAGS.task == 'patch':
+    save_model(decoder_patch, 'decoder_patch')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
@@ -366,7 +376,6 @@ def main(_):
   if FLAGS.task == 'count_cells':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
-
 
   if FLAGS.game_timesteps == FLAGS.model_timesteps:
     def fine_tune_new_decoder(train_indexes, name):
