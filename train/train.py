@@ -152,7 +152,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
             discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
             generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
             gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
-            loss += generator_loss * FLAGS.adver_weight
+            loss += generator_loss * float(step_i / max_train_steps) * FLAGS.adver_weight
             ran_discrim = True
 
       reg_loss = sum(model.losses)
@@ -355,6 +355,7 @@ def main(_):
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
 
+  task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
@@ -377,6 +378,7 @@ def main(_):
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 
+  task_infos[0]['target_metric_val'] = FLAGS.target_pred_state_metric_val
   if FLAGS.game_timesteps == FLAGS.model_timesteps:
     def fine_tune_new_decoder(train_indexes, name):
       print("Train decoder {}".format(name))
