@@ -327,34 +327,35 @@ def main(_):
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
-  print("job_dir", FLAGS.job_dir)
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'w') as out_file:
     out_file.write(FLAGS.flags_into_string())
 
-  # print("task_infos", task_infos, flush=True)
-  # print("Full model training")
-  # get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
-  #                   adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
-  #
-  # task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
-  # if not task_good_enough:
-  #   save_metric_result(-task_metric_result, "final_metric_result")
-  #   return
-  #
-  # save_model(encoder, 'encoder')
-  # save_model(decoder, 'decoder')
-  # save_model(model, 'model')
-  # if FLAGS.count_cells:
-  #   save_model(decoder_counter, 'decoder_counter')
+  print("task_infos", task_infos, flush=True)
+  print("Full model training")
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
+                    adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
+
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
+  if not task_good_enough:
+    save_metric_result(-task_metric_result, "final_metric_result")
+    return
+
+  save_model(encoder, 'encoder')
+  save_model(decoder, 'decoder')
+  save_model(model, 'model')
+  if FLAGS.task == 'count_cells':
+    save_model(decoder_counter, 'decoder_counter')
+  if FLAGS.task == 'patch':
+    save_model(decoder_patch, 'decoder_patch')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
-  task_infos[0]['target_metric_val'] = 0.0
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
 
+  task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
@@ -377,7 +378,7 @@ def main(_):
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 
-
+  task_infos[0]['target_metric_val'] = FLAGS.target_pred_state_metric_val
   if FLAGS.game_timesteps == FLAGS.model_timesteps:
     def fine_tune_new_decoder(train_indexes, name):
       print("Train decoder {}".format(name))

@@ -18,7 +18,7 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('job_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_string('model_save_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_string('model_save_dir', None, '')
 flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
@@ -62,7 +62,10 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   return decoder
 
 def get_save_path(name):
-  return os.path.join(FLAGS.model_save_dir, name+"_ckpt", 'ckpt')
+  save_dir = FLAGS.model_save_dir
+  if save_dir == None:
+    save_dir = FLAGS.job_dir
+  return os.path.join(save_dir, name+"_ckpt", 'ckpt')
 
 def save_model(model, name):
   model.save_weights(get_save_path(name))
@@ -82,15 +85,18 @@ def create_count_decoder():
   maybe_load_model(decoder_counter, 'decoder_counter')
   return decoder_counter
 
-def create_gol_decoder():
-  decoder = tf.keras.Sequential(name="decoder")
+def create_decoder(name):
+  decoder = tf.keras.Sequential(name=name)
   add_decoder_layers(decoder, FLAGS.decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  maybe_load_model(decoder, 'decoder')
+  maybe_load_model(decoder, name)
   return decoder
 
+def create_gol_decoder():
+  return create_decoder("decoder")
+
 def create_patch_decoder():
-  return create_gol_decoder()
+  return create_decoder("patch_decoder")
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
