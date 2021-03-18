@@ -111,10 +111,11 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
 
   def save_image_summary(batch, task_info, step_i):
     num_display_imgs = 3
-    batch = task_info['data_fn'](batch[:num_display_imgs])
+    batch = batch[:num_display_imgs]
     model_results = model(batch[:, 0])
+    task_batch = task_info['data_fn'](batch)
     gen_boards = get_gens(task_info['decoder'], model_results, True)
-    save_datas = {"gt": batch, "p": gen_boards}
+    save_datas = {"gt": task_batch, "p": gen_boards}
     figs = plt_data(save_datas)
     display_img = [fig_to_image(fig) for fig in figs]
     tf.summary.image(metric_prefix+"/"+task_info["name"], display_img, step=step_i, max_outputs=num_display_imgs)
@@ -264,10 +265,6 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
   save_metric_result(regular_metric, "regular_metric_result")
   save_metric_result(max(regular_metric, adver_metric), "final_metric_result")
 
-class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
-  def result(self):
-    return 1 - super().result()
-
 class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
   """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
   def __init__(self, patch_size):
@@ -278,9 +275,6 @@ class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
     return tf.math.round(y * (self.patch_size ** 2))
 
   def update_state(self, y_true, y_pred, sample_weight=None):
-    tf.print("y_true", y_true)
-    tf.print("y_pred", y_pred)
-
     y_true = self.convert_y(y_true)
     y_pred = self.convert_y(y_pred)
 
@@ -314,7 +308,7 @@ def main(_):
 
   task_infos = [
     {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
-      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
+      'loss_fn': mse_loss, 'metric_class': lambda :  AccuracyInverseMetric(1), 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
   if FLAGS.task == 'count':
     task_infos.append(
