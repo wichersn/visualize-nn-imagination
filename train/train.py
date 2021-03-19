@@ -49,7 +49,6 @@ flags.DEFINE_float('adver_weight', 1.0, '')
 
 flags.DEFINE_alias('job-dir', 'job_dir')
 
-
 def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
   """This training function was designed to be flexible to work with a variety of tasks.
