@@ -22,13 +22,15 @@ import train.visualize_metric
 from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, fig_to_image, plt_data
 from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder, save_model
 
+GOL_NAME = 'gol'
+
 FLAGS = flags.FLAGS
 flags.DEFINE_integer('game_timesteps', 2, '')
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_string('task', 'patch', 'gol or count_cells or patch')
-flags.DEFINE_integer('patch_size', 1, '')
+flags.DEFINE_enum('task', 'patch', [GOL_NAME, 'count', 'patch'], '')
+flags.DEFINE_integer('patch_size', 2, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
@@ -105,14 +107,16 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
     total_loss = real_loss + fake_loss
     return total_loss
 
-  def save_image_summary(batch, step_i):
+  def save_image_summary(batch, task_info, step_i):
     num_display_imgs = 3
-    model_results = model(batch[:num_display_imgs, 0])
-    gen_boards = get_gens(task_infos[0]['decoder'], model_results, True)
-    save_datas = {"gt": batch[:num_display_imgs, :], "p": gen_boards}
+    batch = batch[:num_display_imgs]
+    model_results = model(batch[:, 0])
+    task_batch = task_info['data_fn'](batch)
+    gen_boards = get_gens(task_info['decoder'], model_results, True)
+    save_datas = {"gt": task_batch, "p": gen_boards}
     figs = plt_data(save_datas)
     display_img = [fig_to_image(fig) for fig in figs]
-    tf.summary.image(metric_prefix, display_img, step=step_i, max_outputs=num_display_imgs)
+    tf.summary.image(metric_prefix+"/"+task_info["name"], display_img, step=step_i, max_outputs=num_display_imgs)
 
   @tf.function
   def train_step(batch, adver_batch, step_i):
@@ -127,16 +131,13 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       for model_i in range(FLAGS.model_timesteps+1):
         game_i = model_i * FLAGS.game_timesteps // FLAGS.model_timesteps
 
-        print("model_i", model_i)
-        print("game_i", game_i)
-
         for task_info in task_infos:
           batch_targets = task_info['data_fn'](batch)[:, game_i]
 
           pred = task_info['decoder'](model_outputs[model_i])
 
           flatten_fn = tf.keras.layers.Flatten()
-          if task_info["name"] == 'board' and FLAGS.dec_enc_loss_amount > 1e-20:
+          if task_info["name"] == GOL_NAME and FLAGS.dec_enc_loss_amount > 1e-20:
             pred_enc = encoder(pred)
             dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[model_i]), flatten_fn(pred_enc))) + 1
 
@@ -193,7 +194,6 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
 
       train_step(tf.constant(batch), tf.constant(adver_batch), tf.constant(step_i))
 
-
       if step_i == FLAGS.early_stop_step:
         task_good_enough, _ = is_task_good_enough(task_infos, metric_stop_task_name, 'early_metric_val')
         if not task_good_enough:
@@ -205,7 +205,8 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           for name, metric in metrics:
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
-          save_image_summary(batch, step_i)
+          for task_info in task_infos:
+            save_image_summary(batch, task_info, step_i)
 
         writer.flush()
 
@@ -225,6 +226,7 @@ def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
       metric_stop_task = task_info
 
   metric_index = max(metric_stop_task['train_indexes'])
+  print("Stop metric index", metric_index)
   stop_metric = metric_stop_task['metrics'][metric_index]
 
   metric_result = stop_metric.result().numpy()
@@ -261,13 +263,8 @@ def save_metrics(eval_datas, gen_boards, adver_gen_boards, non_train_indexies):
   save_metric_result(regular_metric, "regular_metric_result")
   save_metric_result(max(regular_metric, adver_metric), "final_metric_result")
 
-class BinaryAccuracyInverseMetric(tf.keras.metrics.BinaryAccuracy):
-  def result(self):
-    return 1 - super().result()
-
 class AccuracyInverseMetric(tf.keras.metrics.Accuracy):
   """Gives 1 - the accuracy whe the prediction is rounded to the nearest integer."""
-  patch_size = 1
   def __init__(self, patch_size):
     self.patch_size = patch_size
     super().__init__()
@@ -307,23 +304,18 @@ def main(_):
     task_train_indexes.add(0)
   task_train_indexes.add(FLAGS.model_timesteps)
 
-  if FLAGS.task == 'count_cells':
-    metric_stop_task_name = 'count'
-  else:
-    metric_stop_task_name = 'board'
-
   task_infos = [
-    {'name': 'board', 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
-      'loss_fn': mse_loss, 'metric_class': BinaryAccuracyInverseMetric, 'target_metric_val': FLAGS.target_pred_state_metric_val,
+    {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
+      'loss_fn': mse_loss, 'metric_class': lambda :  AccuracyInverseMetric(1), 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
-  if FLAGS.task == 'count_cells':
+  if FLAGS.task == 'count':
     task_infos.append(
       {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
   if FLAGS.task == 'patch':
     task_infos.append(
-      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
+      {'name': 'patch', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
@@ -333,9 +325,9 @@ def main(_):
   print("task_infos", task_infos, flush=True)
   print("Full model training")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
-                    adversarial_task_name=None, metric_stop_task_name=metric_stop_task_name, metric_prefix='full_model')()
+                    adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
 
-  task_good_enough, task_metric_result = is_task_good_enough(task_infos, metric_stop_task_name, 'target_metric_val')
+  task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
   if not task_good_enough:
     save_metric_result(-task_metric_result, "final_metric_result")
     return
@@ -353,11 +345,11 @@ def main(_):
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder')()
+                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder')()
 
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name='board', metric_stop_task_name='board', metric_prefix='train_decoder_adversarial')()
+                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial')()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gens(decoder, model_results, True)
@@ -373,7 +365,7 @@ def main(_):
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
 
-  if FLAGS.task == 'count_cells':
+  if FLAGS.task == 'count':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
 

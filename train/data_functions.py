@@ -74,7 +74,7 @@ def get_batch(datas, batch_size):
 
 def plt_boards(boards, axes, pos):
   for i in range(len(boards)):
-    axes[pos, i].imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary)
+    axes[pos, i].imshow(boards[i,:,:,0], interpolation='nearest', cmap=plt.cm.binary, vmin=0, vmax=1)
   for i in range(axes.shape[1]):
     axes[pos, i].axis('off')
 
