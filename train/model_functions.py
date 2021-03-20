@@ -18,7 +18,7 @@ from absl import flags
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('job_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
-flags.DEFINE_string('model_save_dir', None, '')
+flags.DEFINE_string('model_save_dir', None, 'The dir to read saved checkpoints from. Defaults to job_dir')
 flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
