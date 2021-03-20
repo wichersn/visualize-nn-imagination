@@ -345,12 +345,12 @@ def main(_):
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder')()
+                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.max_train_steps/10))()
 
   task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial')()
+                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial', max_train_steps=int(FLAGS.max_train_steps/5))()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gens(decoder, model_results, True)
