@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import tensorflow as tf
 from absl import flags
 
 FLAGS = flags.FLAGS
+flags.DEFINE_string('job_dir', '', 'Root directory for writing logs/summaries/checkpoints.')
+flags.DEFINE_string('model_save_dir', None, 'The dir to read saved checkpoints from. Defaults to job_dir')
 flags.DEFINE_integer('model_timesteps', 4, '')
 flags.DEFINE_integer('encoded_size', 8, '')
 flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
+flags.DEFINE_integer('adver_decoder_layers', 2, '')
 flags.DEFINE_integer('decoder_counter_layers', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('use_residual', 1, '')
@@ -57,23 +61,42 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   print(name, decoder.layers)
   return decoder
 
+def get_save_path(name):
+  save_dir = FLAGS.model_save_dir
+  if save_dir == None:
+    save_dir = FLAGS.job_dir
+  return os.path.join(save_dir, name+"_ckpt", 'ckpt')
+
+def save_model(model, name):
+  model.save_weights(get_save_path(name))
+
+def maybe_load_model(model, name):
+  try:
+    model.load_weights(get_save_path(name))
+    print(name + " model loaded")
+  except tf.errors.NotFoundError:
+    pass
+
 def create_count_decoder():
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
   add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
-  print("decoder_counter", decoder_counter.layers)
+  maybe_load_model(decoder_counter, 'decoder_counter')
   return decoder_counter
 
-def create_gol_decoder():
-  decoder = tf.keras.Sequential(name="decoder")
+def create_decoder(name):
+  decoder = tf.keras.Sequential(name=name)
   add_decoder_layers(decoder, FLAGS.decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
-  print("decoder", decoder.layers)
+  maybe_load_model(decoder, name)
   return decoder
 
+def create_gol_decoder():
+  return create_decoder("decoder")
+
 def create_patch_decoder():
-  return create_gol_decoder()
+  return create_decoder("patch_decoder")
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
@@ -116,6 +139,8 @@ def create_models():
       ], name="discriminator",
   )
 
-  adver_decoder = get_stop_grad_dec(FLAGS.decoder_layers, "adver_decoder")
+  adver_decoder = get_stop_grad_dec(FLAGS.adver_decoder_layers, "adver_decoder")
+  maybe_load_model(encoder, 'encoder')
+  maybe_load_model(model, 'model')
 
   return encoder, intermediates, adver_decoder, model, discriminator

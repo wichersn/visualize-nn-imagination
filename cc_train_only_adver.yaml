@@ -1,0 +1,56 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This config is designed to be used to train from a pretrained checkpoint.
+# The flags which were used to train the pretrained model should also be specified.
+trainingInput:
+  scaleTier: CUSTOM
+  masterType: n1-standard-4
+  masterConfig:
+    acceleratorConfig:
+      count: 1
+      type: NVIDIA_TESLA_P100
+  hyperparameters:
+    goal: MAXIMIZE
+    hyperparameterMetricTag: final_metric_result
+    maxTrials: 10
+    maxParallelTrials: 5
+    params:
+#      - parameterName: adver_decoder_layers
+#        type: INTEGER
+#        minValue: 1
+#        maxValue: 5
+#        scaleType: UNIT_LINEAR_SCALE
+#
+#      - parameterName: adver_weight
+#        type: DOUBLE
+#        minValue: 0.01
+#        maxValue: 1.0
+#        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: adver_decoder_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: adver_weight
+        type: DOUBLE
+        minValue: 0.031
+        maxValue: 0.037
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: model_save_dir
+        type: CATEGORICAL
+        categoricalValues: ["gs://visualize-nn-imagination-runs/cc_different_ts_game3_model2_save_9933351/9"]

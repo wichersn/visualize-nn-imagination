@@ -31,11 +31,17 @@ trainingInput:
         
       - parameterName: patch_size
         type: INTEGER
-        minValue: 1
-        maxValue: 20
+        minValue: 2
+        maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: num_timesteps
+      - parameterName: game_timesteps
+        type: INTEGER
+        minValue: 2
+        maxValue: 2
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: model_timesteps
         type: INTEGER
         minValue: 2
         maxValue: 2
@@ -51,12 +57,6 @@ trainingInput:
         type: INTEGER
         minValue: 1
         maxValue: 1
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: random_board_prob
-        type: DOUBLE
-        minValue: 1.0
-        maxValue: 1.0
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoder_layers
@@ -77,21 +77,9 @@ trainingInput:
         maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: decoder_counter_layers
-        type: INTEGER
-        minValue: 2
-        maxValue: 3
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_counter_strides
-        type: INTEGER
-        minValue: 2
-        maxValue: 2
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 2
+        minValue: 4
         maxValue: 30
         scaleType: UNIT_LINEAR_SCALE
 
