@@ -376,7 +376,7 @@ def main(_):
       task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
       print("task infos", task_infos)
       get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-                        adversarial_task_name=None, metric_stop_task_name='board', metric_prefix='train_decoder_{}'.format(name),
+                        adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_{}'.format(name),
                       max_train_steps=int(FLAGS.max_train_steps/10))()
       new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
       save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
