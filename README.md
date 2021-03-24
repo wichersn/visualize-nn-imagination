@@ -1,7 +1,7 @@
 # This is a code repository for work in progress paper Visualizing Neural netwroks Imagination 
 ## Launch on cloud
     chmod +x launch_cloud.sh
-    ./launch_cloud.sh cc_3ts.yaml job_name
+    ./launch_cloud.sh configs/cc_3ts.yaml job_name
     
 You might have to change the `--region` flag in `launch_cloud` to get it to schedule. Sometimes jobs stay `Queued` for 10 hours. See [here](https://cloud.google.com/compute/docs/gpus) for regions with p100s or whatever gpu type is in `cloud_config.yaml`
     
