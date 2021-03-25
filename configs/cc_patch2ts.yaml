@@ -28,11 +28,11 @@ trainingInput:
       - parameterName: task
         type: CATEGORICAL
         categoricalValues: ['patch']
-        
+
       - parameterName: patch_size
         type: INTEGER
-        minValue: 2
-        maxValue: 2
+        minValue: 4
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: game_timesteps
