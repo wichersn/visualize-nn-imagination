@@ -127,6 +127,6 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 200000
-        maxValue: 200000
+        minValue: 500000
+        maxValue: 500000
         scaleType: UNIT_LINEAR_SCALE

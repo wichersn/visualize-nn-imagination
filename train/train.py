@@ -222,7 +222,6 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
 
 def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
   for task_info in task_infos:
-    print(" task_info[name]",  task_info["name"], "metric_stop_task_name", metric_stop_task_name)
     if metric_stop_task_name == task_info["name"]:
       metric_stop_task = task_info
 
