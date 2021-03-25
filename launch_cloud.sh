@@ -15,8 +15,8 @@
 # Usage:
 # Follow instructions at the Before you begin section of https://cloud.google.com/ai-platform/training/docs/custom-containers-training#before_you_begin
 # chmod +x launch_cloud.sh
-# ./launch_cloud.sh configs/cc_4ts.yaml job_name
-# ./launch_cloud.sh configs/cc_count5x5_2ts.yaml job_name
+# ./launch_cloud.sh cc_4ts.yaml job_name
+# ./launch_cloud.sh cc_count5x5_2ts.yaml job_name
 
 # This launches a new training on google cloud.
 # If you want to do something else, you can use these commands as examples.
@@ -39,6 +39,6 @@ gcloud ai-platform jobs submit training $JOB_NAME \
   --python-version 3.7 \
   --runtime-version 2.2 \
   --job-dir $JOB_DIR \
-  --config $1 \
+  --config configs/$1 \
 
 echo "python3 -m tensorboard.main --logdir $JOB_DIR"
