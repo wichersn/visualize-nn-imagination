@@ -206,7 +206,8 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
             tf.summary.scalar(metric_prefix + "/" +name, metric.result(), step=step_i)
 
           for task_info in task_infos:
-            save_image_summary(batch, task_info, step_i)
+            if task_info["name"] != "count":
+              save_image_summary(batch, task_info, step_i)
 
         writer.flush()
 
@@ -334,7 +335,7 @@ def main(_):
   save_model(encoder, 'encoder')
   save_model(decoder, 'decoder')
   save_model(model, 'model')
-  if FLAGS.task == 'count_cells':
+  if FLAGS.task == 'count':
     save_model(decoder_counter, 'decoder_counter')
   if FLAGS.task == 'patch':
     save_model(decoder_patch, 'decoder_patch')

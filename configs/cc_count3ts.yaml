@@ -27,7 +27,7 @@ trainingInput:
     params:
       - parameterName: task
         type: CATEGORICAL
-        categoricalValues: ['count_cells']
+        categoricalValues: ['count']
 
 
 

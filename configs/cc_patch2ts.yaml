@@ -31,8 +31,8 @@ trainingInput:
 
       - parameterName: patch_size
         type: INTEGER
-        minValue: 4
-        maxValue: 4
+        minValue: 10
+        maxValue: 10
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: game_timesteps
