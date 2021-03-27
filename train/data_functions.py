@@ -38,6 +38,16 @@ def num_black_cells_in_patch(X):
   targets = tf.nn.pool(X, (1, FLAGS.patch_size, FLAGS.patch_size), 'AVG', padding='SAME')
   return targets
 
+def num_black_cells_in_grid(X):
+  # X is [batch_size, timesteps, board_size, board_size, 1] and targets is same dims as X
+  if FLAGS.board_size % FLAGS.grid_size > 0:
+  	raise Exception('Board size is not divisible by grid size')
+  targets = tf.nn.pool(X, (1, FLAGS.grid_size, FLAGS.grid_size), 'AVG', (1, FLAGS.grid_size, FLAGS.grid_size), padding='SAME')
+  # targets is dim ceil(board size / grid size)
+  targets = np.repeat(targets, FLAGS.grid_size, axis=2)
+  targets = np.repeat(targets, FLAGS.grid_size, axis=3)
+  return targets
+
 
 def convert_model_in(data):
   data = np.array(data)

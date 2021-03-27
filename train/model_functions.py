@@ -74,7 +74,7 @@ def maybe_load_model(model, name):
   try:
     model.load_weights(get_save_path(name))
     print(name + " model loaded")
-  except tf.errors.NotFoundError:
+  except:
     pass
 
 def create_count_decoder():
@@ -97,6 +97,9 @@ def create_gol_decoder():
 
 def create_patch_decoder():
   return create_decoder("patch_decoder")
+
+def create_grid_decoder():
+  return create_decoder("grid_decoder")
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
