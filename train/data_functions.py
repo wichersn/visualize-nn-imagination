@@ -44,8 +44,8 @@ def num_black_cells_in_grid(X):
   	raise Exception('Board size is not divisible by grid size')
   targets = tf.nn.pool(X, (1, FLAGS.grid_size, FLAGS.grid_size), 'AVG', (1, FLAGS.grid_size, FLAGS.grid_size), padding='SAME')
   # targets is dim ceil(board size / grid size)
-  targets = np.repeat(targets, FLAGS.grid_size, axis=2)
-  targets = np.repeat(targets, FLAGS.grid_size, axis=3)
+  targets = tf.repeat(targets, FLAGS.grid_size, axis=2)
+  targets = tf.repeat(targets, FLAGS.grid_size, axis=3)
   return targets
 
 
