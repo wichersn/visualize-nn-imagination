@@ -15,8 +15,8 @@
 # Usage:
 # Follow instructions at the Before you begin section of https://cloud.google.com/ai-platform/training/docs/custom-containers-training#before_you_begin
 # chmod +x launch_cloud.sh
-# ./launch_cloud.sh cc_4ts.yaml job_name
-# ./launch_cloud.sh cc_count5x5_2ts.yaml job_name
+# ./launch_cloud.sh gol4ts.yaml job_name
+# ./launch_cloud.sh count5x5_2ts.yaml job_name
 
 # This launches a new training on google cloud.
 # If you want to do something else, you can use these commands as examples.
