@@ -13,14 +13,15 @@
 # limitations under the License.
 
 import numpy as np
-import tensorflow as tf
 from absl import app
 from absl import flags
 import os
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+import tensorflow as tf
 
 import train.visualize_metric
-from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, fig_to_image, plt_data
-from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_gol_decoder, save_model
+from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, num_black_cells_in_grid, fig_to_image, plt_data
+from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_decoder, save_model
 
 GOL_NAME = 'gol'
 
@@ -29,8 +30,9 @@ flags.DEFINE_integer('game_timesteps', 2, '')
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
 flags.DEFINE_integer('max_train_steps', 80000, '')
-flags.DEFINE_enum('task', 'patch', [GOL_NAME, 'count', 'patch'], '')
+flags.DEFINE_enum('task', 'patch', [GOL_NAME, 'count', 'patch', 'grid'], '')
 flags.DEFINE_integer('patch_size', 2, '')
+flags.DEFINE_integer('grid_size', 2, '')
 flags.DEFINE_integer('use_autoencoder', 1, '')
 flags.DEFINE_integer('use_task_autoencoder', 1, '')
 
@@ -289,9 +291,10 @@ def main(_):
   datas = gen_data_batch(200000, FLAGS.game_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.game_timesteps)
   encoder, intermediates, adver_decoder, model, discriminator = create_models()
-  decoder = create_gol_decoder()
   decoder_counter = create_count_decoder()
-  decoder_patch = create_patch_decoder()
+  decoder = create_decoder('decoder')
+  decoder_patch = create_decoder('decoder_patch')
+  decoder_grid = create_decoder('decoder_grid')
 
   gol_train_indexes = set()
   if FLAGS.use_autoencoder:
@@ -318,6 +321,11 @@ def main(_):
       {'name': 'patch', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
+  if FLAGS.task == 'grid':
+    task_infos.append(
+      {'name': 'grid', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_grid, 'decoder': decoder_grid,
+      'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.grid_size), 'target_metric_val': FLAGS.target_task_metric_val,
+       'early_metric_val': FLAGS.early_task_metric_val})
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'w') as out_file:
     out_file.write(FLAGS.flags_into_string())
@@ -339,6 +347,8 @@ def main(_):
     save_model(decoder_counter, 'decoder_counter')
   if FLAGS.task == 'patch':
     save_model(decoder_patch, 'decoder_patch')
+  if FLAGS.task == 'grid':
+    save_model(decoder_grid, 'decoder_grid')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.

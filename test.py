@@ -17,7 +17,7 @@ import unittest
 from train import visualize_metric
 from train.train import AccuracyInverseMetric
 import numpy as np
-from train.data_functions import num_black_cells, gen_data_batch, get_batch
+from train.data_functions import num_black_cells, gen_data_batch, get_batch, num_black_cells_in_grid
 
 
 from absl import flags
@@ -138,6 +138,22 @@ class AccuracyInverseMetricTestCase(unittest.TestCase):
       y_true = np.array([1,     0,  2,    4,   3])  / 4.0
       metric.update_state(y_true, y_pred)
       self.assertAlmostEqual(1-3/5, metric.result().numpy())
+
+class DataTestCase(unittest.TestCase):
+    def setUp(self):
+        FLAGS(['test'])
+
+    def test_grid(self):
+      n = FLAGS.board_size
+      g = FLAGS.grid_size
+      X = np.random.rand(1, 1, n, n, 1)
+      y = np.zeros_like(X)
+      for i in range(n):
+        for j in range(n):
+          a = i // g
+          b = j // g
+          y[0, 0, i, j, 0] = np.mean(X[0, 0, a * g:(a + 1) * g, b * g:(b + 1) * g, 0])
+      np.testing.assert_array_almost_equal(y, num_black_cells_in_grid(X))
 
 if __name__ == '__main__':
     unittest.main()

@@ -74,7 +74,7 @@ def maybe_load_model(model, name):
   try:
     model.load_weights(get_save_path(name))
     print(name + " model loaded")
-  except tf.errors.NotFoundError:
+  except:
     pass
 
 def create_count_decoder():
@@ -91,12 +91,6 @@ def create_decoder(name):
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   maybe_load_model(decoder, name)
   return decoder
-
-def create_gol_decoder():
-  return create_decoder("decoder")
-
-def create_patch_decoder():
-  return create_decoder("patch_decoder")
 
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
