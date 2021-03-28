@@ -44,8 +44,10 @@ def num_black_cells_in_grid(X):
   	raise Exception('Board size is not divisible by grid size')
   targets = tf.nn.pool(X, (1, FLAGS.grid_size, FLAGS.grid_size), 'AVG', (1, FLAGS.grid_size, FLAGS.grid_size), padding='SAME')
   # targets is dim ceil(board size / grid size)
-  targets = tf.repeat(targets, FLAGS.grid_size, axis=2)
-  targets = tf.repeat(targets, FLAGS.grid_size, axis=3)
+  shape = targets.shape
+  targets = tf.reshape(targets, [shape[0] * shape[1]] + shape[2:]) # resize expects 1 batch dimension
+  targets = tf.image.resize(targets, [FLAGS.board_size, FLAGS.board_size], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+  targets = tf.reshape(targets, shape[:2] + targets.shape[1:])
   return targets
 
 

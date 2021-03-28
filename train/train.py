@@ -21,7 +21,7 @@ import tensorflow as tf
 
 import train.visualize_metric
 from train.data_functions import plt_data, num_black_cells, gen_data_batch, get_batch, num_black_cells_in_patch, num_black_cells_in_grid, fig_to_image, plt_data
-from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_patch_decoder, create_grid_decoder, create_gol_decoder, save_model
+from train.model_functions import create_models, get_stop_grad_dec, create_count_decoder, create_decoder, save_model
 
 GOL_NAME = 'gol'
 
@@ -291,10 +291,10 @@ def main(_):
   datas = gen_data_batch(200000, FLAGS.game_timesteps)
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.game_timesteps)
   encoder, intermediates, adver_decoder, model, discriminator = create_models()
-  decoder = create_gol_decoder()
   decoder_counter = create_count_decoder()
-  decoder_patch = create_patch_decoder()
-  decoder_grid = create_grid_decoder()
+  decoder = create_decoder('decoder')
+  decoder_patch = create_decoder('decoder_patch')
+  decoder_grid = create_decoder('decoder_grid')
 
   gol_train_indexes = set()
   if FLAGS.use_autoencoder:

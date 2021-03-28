@@ -92,15 +92,6 @@ def create_decoder(name):
   maybe_load_model(decoder, name)
   return decoder
 
-def create_gol_decoder():
-  return create_decoder("decoder")
-
-def create_patch_decoder():
-  return create_decoder("patch_decoder")
-
-def create_grid_decoder():
-  return create_decoder("grid_decoder")
-
 def create_models():
   input_shape = [FLAGS.board_size, FLAGS.board_size] + [1, ]
   input_layer = tf.keras.Input(shape=input_shape)

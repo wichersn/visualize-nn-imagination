@@ -153,7 +153,7 @@ class DataTestCase(unittest.TestCase):
           a = i // g
           b = j // g
           y[0, 0, i, j, 0] = np.mean(X[0, 0, a * g:(a + 1) * g, b * g:(b + 1) * g, 0])
-      self.assertIsNone(np.testing.assert_array_almost_equal(y, num_black_cells_in_grid(X)))
+      np.testing.assert_array_almost_equal(y, num_black_cells_in_grid(X))
 
 if __name__ == '__main__':
     unittest.main()
