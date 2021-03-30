@@ -292,9 +292,9 @@ def main(_):
   eval_datas = gen_data_batch(FLAGS.eval_data_size, FLAGS.game_timesteps)
   encoder, intermediates, adver_decoder, model, discriminator = create_models()
   decoder_counter = create_count_decoder()
-  decoder = create_decoder('decoder')
-  decoder_patch = create_decoder('decoder_patch')
-  decoder_grid = create_decoder('decoder_grid')
+  decoder = create_decoder('decoder', FLAGS.decoder_layers)
+  decoder_patch = create_decoder('decoder_patch', FLAGS.decoder_task_layers)
+  decoder_grid = create_decoder('decoder_grid', FLAGS.decoder_task_layers)
 
   gol_train_indexes = set()
   if FLAGS.use_autoencoder:
