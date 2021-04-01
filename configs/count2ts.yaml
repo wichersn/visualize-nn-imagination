@@ -43,9 +43,9 @@ trainingInput:
 
       - parameterName: dec_enc_loss_amount
         type: DOUBLE
-        minValue: 0.001
-        maxValue: 0.004
-        scaleType: UNIT_LINEAR_SCALE
+        minValue: 0.00001
+        maxValue: 0.01
+        scaleType: UNIT_LOG_SCALE
 
       - parameterName: board_size
         type: INTEGER
@@ -62,13 +62,13 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
         minValue: 5
-        maxValue: 6
+        maxValue: 7
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
@@ -77,16 +77,22 @@ trainingInput:
         maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: decoder_task_layers
+        type: INTEGER
+        minValue: 3
+        maxValue: 8
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: encoded_size
         type: INTEGER
         minValue: 24
-        maxValue: 40
+        maxValue: 50
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 200
-        maxValue: 512
+        minValue: 100
+        maxValue: 400
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
@@ -109,7 +115,7 @@ trainingInput:
 
       - parameterName: use_residual
         type: INTEGER
-        minValue: 1
+        minValue: 0
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 

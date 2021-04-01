@@ -29,7 +29,9 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('game_timesteps', 2, '')
 flags.DEFINE_integer('eval_data_size', 10000, '')
 flags.DEFINE_integer('eval_interval', 5000, '')
-flags.DEFINE_integer('max_train_steps', 80000, '')
+flags.DEFINE_integer('max_train_steps',  120000, '')
+flags.DEFINE_integer('adver_train_steps', 50000, '')
+flags.DEFINE_integer('max_dec_train_steps', 10000, '')
 flags.DEFINE_enum('task', 'patch', [GOL_NAME, 'count', 'patch', 'grid'], '')
 flags.DEFINE_integer('patch_size', 2, '')
 flags.DEFINE_integer('grid_size', 2, '')
@@ -355,12 +357,12 @@ def main(_):
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.max_train_steps/10))()
+                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.adver_train_steps))()
 
   task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
   get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial', max_train_steps=int(FLAGS.max_train_steps/5))()
+                    adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial', max_train_steps=int(FLAGS.adver_train_steps))()
 
   model_results = model(eval_datas[:, 0])
   gen_boards = get_gens(decoder, model_results, True)
@@ -389,7 +391,7 @@ def main(_):
       print("task infos", task_infos)
       get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
                         adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_{}'.format(name),
-                      max_train_steps=int(FLAGS.max_train_steps/10))()
+                      max_train_steps=int(FLAGS.max_dec_train_steps))()
       new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
       save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
 
