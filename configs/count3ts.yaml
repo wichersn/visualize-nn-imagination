@@ -43,8 +43,8 @@ trainingInput:
 
       - parameterName: dec_enc_loss_amount
         type: DOUBLE
-        minValue: 0.0000001
-        maxValue: 0.005
+        minValue: 0.0001
+        maxValue: 0.0005
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: board_size
