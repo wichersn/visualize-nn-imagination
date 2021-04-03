@@ -25,7 +25,7 @@ flags.DEFINE_integer('encoder_layers', 2, '')
 flags.DEFINE_integer('timestep_layers', 3, '')
 flags.DEFINE_integer('decoder_layers', 2, '')
 flags.DEFINE_integer('adver_decoder_layers', 2, '')
-flags.DEFINE_integer('decoder_counter_layers', 2, 'Only used for the count cells task.')
+flags.DEFINE_integer('decoder_task_layers', 2, '')
 flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cells task.')
 flags.DEFINE_integer('use_residual', 1, '')
 flags.DEFINE_integer('use_rnn', 1, '')
@@ -79,15 +79,15 @@ def maybe_load_model(model, name):
 
 def create_count_decoder():
   decoder_counter = tf.keras.Sequential(name="decoder-counter")
-  add_decoder_layers(decoder_counter, FLAGS.decoder_counter_layers-1)
+  add_decoder_layers(decoder_counter, FLAGS.decoder_task_layers-1)
   decoder_counter.add(tf.keras.layers.Flatten())
   decoder_counter.add(tf.keras.layers.Dense(1))
   maybe_load_model(decoder_counter, 'decoder_counter')
   return decoder_counter
 
-def create_decoder(name):
+def create_decoder(name, decoder_layers):
   decoder = tf.keras.Sequential(name=name)
-  add_decoder_layers(decoder, FLAGS.decoder_layers)
+  add_decoder_layers(decoder, decoder_layers)
   decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   maybe_load_model(decoder, name)
   return decoder

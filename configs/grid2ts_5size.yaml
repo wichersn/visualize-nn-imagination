@@ -31,8 +31,8 @@ trainingInput:
 
       - parameterName: grid_size
         type: INTEGER
-        minValue: 10
-        maxValue: 10
+        minValue: 5
+        maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: game_timesteps
@@ -49,9 +49,9 @@ trainingInput:
 
       - parameterName: dec_enc_loss_amount
         type: DOUBLE
-        minValue: 0.001
-        maxValue: 0.004
-        scaleType: UNIT_LINEAR_SCALE
+        minValue: 0.00001
+        maxValue: 0.01
+        scaleType: UNIT_LOG_SCALE
 
       - parameterName: board_size
         type: INTEGER
@@ -68,43 +68,49 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
         minValue: 5
-        maxValue: 6
+        maxValue: 7
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
         type: INTEGER
-        minValue: 1
+        minValue: 2
         maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_task_layers
+        type: INTEGER
+        minValue: 5
+        maxValue: 7
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 24
-        maxValue: 40
+        minValue: 25
+        maxValue: 50
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 200
-        maxValue: 512
+        minValue: 100
+        maxValue: 300
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: .0005
-        maxValue: .00075
+        minValue: .0004
+        maxValue: .0007
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: lr_decay_rate_per1M_steps
         type: DOUBLE
-        minValue: .4
-        maxValue: .7
+        minValue: .3
+        maxValue: .6
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: reg_amount
@@ -115,7 +121,7 @@ trainingInput:
 
       - parameterName: use_residual
         type: INTEGER
-        minValue: 1
+        minValue: 0
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
@@ -127,6 +133,6 @@ trainingInput:
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 200000
-        maxValue: 200000
+        minValue: 120000
+        maxValue: 120000
         scaleType: UNIT_LINEAR_SCALE

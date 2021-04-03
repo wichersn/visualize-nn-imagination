@@ -29,8 +29,6 @@ trainingInput:
         type: CATEGORICAL
         categoricalValues: ['count']
 
-
-
       - parameterName: game_timesteps
         type: INTEGER
         minValue: 3
@@ -42,7 +40,13 @@ trainingInput:
         minValue: 3
         maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
-        
+
+      - parameterName: dec_enc_loss_amount
+        type: DOUBLE
+        minValue: 0.0001
+        maxValue: 0.0005
+        scaleType: UNIT_LOG_SCALE
+
       - parameterName: board_size
         type: INTEGER
         minValue: 10
@@ -55,64 +59,52 @@ trainingInput:
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: random_board_prob
-        type: DOUBLE
-        minValue: 1.0
-        maxValue: 1.0
-        scaleType: UNIT_LINEAR_SCALE
-
       - parameterName: encoder_layers
-        type: INTEGER
-        minValue: 2
-        maxValue: 3
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: timestep_layers
-        type: INTEGER
-        minValue: 2
-        maxValue: 5
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_layers
-        type: INTEGER
-        minValue: 1
-        maxValue: 2
-        scaleType: UNIT_LINEAR_SCALE
-
-      - parameterName: decoder_counter_layers
         type: INTEGER
         minValue: 2
         maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
+      - parameterName: timestep_layers
+        type: INTEGER
+        minValue: 4
+        maxValue: 7
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_layers
+        type: INTEGER
+        minValue: 1
+        maxValue: 3
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: decoder_task_layers
+        type: INTEGER
+        minValue: 3
+        maxValue: 8
+        scaleType: UNIT_LINEAR_SCALE
+
       - parameterName: decoder_counter_strides
         type: INTEGER
-        minValue: 2
+        minValue: 1
         maxValue: 2
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: encoded_size
         type: INTEGER
-        minValue: 4
-        maxValue: 30
+        minValue: 20
+        maxValue: 50
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: batch_size
         type: INTEGER
-        minValue: 300
-        maxValue: 512
+        minValue: 100
+        maxValue: 400
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: learning_rate
         type: DOUBLE
-        minValue: 0.0001
-        maxValue: 0.01
-        scaleType: UNIT_LOG_SCALE
-
-      - parameterName: dec_enc_loss_amount
-        type: DOUBLE
-        minValue: 0.001
-        maxValue: .5
+        minValue: .0005
+        maxValue: .003
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: lr_decay_rate_per1M_steps
@@ -123,24 +115,24 @@ trainingInput:
 
       - parameterName: use_residual
         type: INTEGER
-        minValue: 1
+        minValue: 0
         maxValue: 1
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: max_train_steps
         type: INTEGER
-        minValue: 1000000
-        maxValue: 1000000
+        minValue: 400000
+        maxValue: 400000
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: early_task_metric_val
         type: DOUBLE
-        minValue: 0.7
-        maxValue: 0.7
+        minValue: 0.1
+        maxValue: 0.1
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: early_stop_step
         type: INTEGER
-        minValue: 500000
-        maxValue: 500000
+        minValue: 200000
+        maxValue: 200000
         scaleType: UNIT_LINEAR_SCALE
