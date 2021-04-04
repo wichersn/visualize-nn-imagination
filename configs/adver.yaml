@@ -27,30 +27,36 @@ trainingInput:
     maxTrials: 10
     maxParallelTrials: 5
     params:
-#      - parameterName: adver_decoder_layers
-#        type: INTEGER
-#        minValue: 1
-#        maxValue: 5
-#        scaleType: UNIT_LINEAR_SCALE
-#
-#      - parameterName: adver_weight
-#        type: DOUBLE
-#        minValue: 0.01
-#        maxValue: 1.0
-#        scaleType: UNIT_LOG_SCALE
-
       - parameterName: adver_decoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 3
+        maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: adver_weight
         type: DOUBLE
-        minValue: 0.031
-        maxValue: 0.037
-        scaleType: UNIT_LOG_SCALE
+        minValue: 0.1
+        maxValue: 2.0
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: discrim_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 5
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: discrim_layer_size
+        type: INTEGER
+        minValue: 3
+        maxValue: 12
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: discrim_drop_rate
+        type: DOUBLE
+        minValue: 0.
+        maxValue: .5
+        scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: model_save_dir
         type: CATEGORICAL
-        categoricalValues: ["gs://visualize-nn-imagination-runs/cc_different_ts_game3_model2_save_9933351/9"]
+        categoricalValues: ["gs://visualize-nn-imagination-runs/count2ts_better_hparams_med_dec_enc_15549808/7"]
