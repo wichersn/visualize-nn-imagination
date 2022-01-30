@@ -53,7 +53,7 @@ flags.DEFINE_float('adver_weight', 1.0, '')
 
 flags.DEFINE_alias('job-dir', 'job_dir')
 
-def get_train_model(task_infos, model, encoder, datas, discriminator, should_train_model,
+def get_train_model(task_infos, model, encoder, discriminator, should_train_model,
                     adversarial_task_name, metric_stop_task_name, metric_prefix, max_train_steps=None):
   """This training function was designed to be flexible to work with a variety of tasks.
 
@@ -65,7 +65,6 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
     target_metric_val: Training will stop when the metric gets below this value,
     early_metric_val: Training will stop if the metric is above this value after x steps
   @param model:
-  @param datas: The game of life board states
   @param discriminator:
   @param should_train_model: If false, it only trains the decoder.
   @param adversarial_task_name: The task with the decoder to train adversarially.
@@ -310,22 +309,25 @@ def main(_):
   task_train_indexes.add(FLAGS.model_timesteps)
 
   task_infos = [
-    {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
+    {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data': datas, 'decoder': decoder,
       'loss_fn': mse_loss, 'metric_class': lambda :  AccuracyInverseMetric(1), 'target_metric_val': FLAGS.target_pred_state_metric_val,
      'early_metric_val': FLAGS.early_pred_state_metric_val}]
   if FLAGS.task == 'count':
+    count_datas = num_black_cells(datas)
     task_infos.append(
-      {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
+      {'name': 'count', 'train_indexes': task_train_indexes, 'data': count_datas, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
   if FLAGS.task == 'patch':
+    patch_datas = num_black_cells_in_patch(datas)
     task_infos.append(
-      {'name': 'patch', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
+      {'name': 'patch', 'train_indexes': task_train_indexes, 'data': patch_datas, 'decoder': decoder_patch,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
   if FLAGS.task == 'grid':
+    grid_datas = num_black_cells_in_grid(datas)
     task_infos.append(
-      {'name': 'grid', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_grid, 'decoder': decoder_grid,
+      {'name': 'grid', 'train_indexes': task_train_indexes, 'data': grid_datas, 'decoder': decoder_grid,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.grid_size), 'target_metric_val': FLAGS.target_task_metric_val,
        'early_metric_val': FLAGS.early_task_metric_val})
 
@@ -334,7 +336,7 @@ def main(_):
 
   print("task_infos", task_infos, flush=True)
   print("Full model training")
-  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, discriminator=None, should_train_model=True,
                     adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
 
   task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
@@ -356,12 +358,12 @@ def main(_):
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
   print("task infos adversarial", task_infos)
   print("Training Only Decoder", flush=True)
-  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.adver_train_steps))()
 
   task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
-  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
+  get_train_model(task_infos=task_infos, model=model, encoder=encoder, discriminator=discriminator, should_train_model=False,
                     adversarial_task_name=GOL_NAME, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_adversarial', max_train_steps=int(FLAGS.adver_train_steps))()
 
   model_results = model(eval_datas[:, 0])
@@ -377,28 +379,6 @@ def main(_):
   save_np(eval_datas, "eval_datas")
   save_np(gen_boards, "gen_boards")
   save_np(adver_gen_boards, "adver_gen_boards")
-
-  if FLAGS.task == 'count':
-    task_gen = get_gens(decoder_counter, model_results, False)
-    save_np(task_gen, "task_gen")
-
-  task_infos[0]['target_metric_val'] = FLAGS.target_pred_state_metric_val
-  if FLAGS.game_timesteps == FLAGS.model_timesteps:
-    def fine_tune_new_decoder(train_indexes, name):
-      print("Train decoder {}".format(name))
-      task_infos[0]["train_indexes"] = train_indexes
-      task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
-      print("task infos", task_infos)
-      get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-                        adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_{}'.format(name),
-                      max_train_steps=int(FLAGS.max_dec_train_steps))()
-      new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
-      save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
-
-    fine_tune_new_decoder({0, FLAGS.model_timesteps}, "first_last")
-    fine_tune_new_decoder(set(range(FLAGS.model_timesteps+1)), "all")
-    for dec_ts in range(FLAGS.model_timesteps + 1):
-      fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)
