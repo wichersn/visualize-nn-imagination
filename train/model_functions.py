@@ -102,20 +102,51 @@ def create_models():
     encoder.add(tf.keras.layers.Dropout(FLAGS.dropout_rate))
   print("encoder", encoder.layers)
 
-  intermediates = [encoder(input_layer)]
+  # The first timestep is the encoded, and the rest are 0s
+  # encoded_padded = tf.zeros([FLAGS.batch_size, FLAGS.model_timesteps] + input_shape)
+  # encoded_padded[:,0] = encoder(input_layer)
 
-  if FLAGS.use_rnn:
-    timestep_model = create_timestep_model()
+  encoded = encoder(input_layer)
+  print("encoded", encoded)
+
+  encoded_padded = []
   for i in range(FLAGS.model_timesteps):
-    if not FLAGS.use_rnn:
-      timestep_model = create_timestep_model('_'+str(i))
+    if i == 0:
+      append_val = encoded
+    else:
+      append_val = tf.zeros_like(encoded)
+    encoded_padded.append(append_val)
+  encoded_padded = tf.transpose(encoded_padded, [1,0,2,3,4])
 
-    timestep = timestep_model(intermediates[-1])
-    if FLAGS.use_residual:
-      timestep += intermediates[-1]
-    intermediates.append(timestep)
+  print("encoded_padded", encoded_padded)
+
+  layer = encoded_padded
+  for i in range(FLAGS.timestep_layers):
+    layer = tf.keras.layers.ConvLSTM2D(FLAGS.encoded_size,
+                                       3, padding='same',
+                                       kernel_regularizer=tf.keras.regularizers.l2(1),
+                                       return_sequences=True)(layer)
+
+  # Put the timesteps first to return
+  intermediates = tf.split(layer, FLAGS.model_timesteps, axis=1)
+  intermediates = [encoded] + [tf.squeeze(x, axis=1) for x in intermediates]
+
+  print("intermediates", intermediates)
+  #intermediates = [encoder(input_layer)]
+
+  # if FLAGS.use_rnn:
+  #   timestep_model = create_timestep_model()
+  # for i in range(FLAGS.model_timesteps):
+  #   if not FLAGS.use_rnn:
+  #     timestep_model = create_timestep_model('_'+str(i))
+  #
+  #   timestep = timestep_model(intermediates[-1])
+  #   if FLAGS.use_residual:
+  #     timestep += intermediates[-1]
+  #   intermediates.append(timestep)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
+  model.summary()
 
   discriminator = tf.keras.Sequential(
       [

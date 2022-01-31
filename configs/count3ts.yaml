@@ -43,8 +43,8 @@ trainingInput:
 
       - parameterName: dec_enc_loss_amount
         type: DOUBLE
-        minValue: 0.0001
-        maxValue: 0.0005
+        minValue: 0.0
+        maxValue: 0.0
         scaleType: UNIT_LOG_SCALE
 
       - parameterName: board_size
@@ -67,8 +67,8 @@ trainingInput:
 
       - parameterName: timestep_layers
         type: INTEGER
-        minValue: 4
-        maxValue: 5
+        minValue: 3
+        maxValue: 6
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
