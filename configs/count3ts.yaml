@@ -62,13 +62,13 @@ trainingInput:
       - parameterName: encoder_layers
         type: INTEGER
         minValue: 2
-        maxValue: 4
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: timestep_layers
         type: INTEGER
         minValue: 4
-        maxValue: 7
+        maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: decoder_layers
