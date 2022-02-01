@@ -40,5 +40,5 @@ gcloud ai-platform jobs submit training $JOB_NAME \
   --runtime-version 2.2 \
   --job-dir $JOB_DIR \
   --config configs/$1 \
-
+  -- --adver_train_steps=50000 --batch_size=420 --dec_enc_loss_amount=0.0 --early_pred_state_metric_val=1.0 --early_stop_step=100000 --early_task_metric_val=1.0 --eval_data_size=10000 --eval_interval=5000 --game_timesteps=4 --grid_size=2 --learning_rate=0.00011514055882891486 --lr_decay_rate_per1M_steps=0.9 --max_dec_train_steps=10000 --max_train_steps=120000 --patch_size=2 --reg_amount=0.0 --target_pred_state_metric_val=0.01 --target_task_metric_val=0.001 --task=gol --use_autoencoder=1 --use_task_autoencoder=1 --board_size=20 --random_board_prob=0.1 --decoder_counter_strides=2 --decoder_layers=2 --decoder_task_layers=2 --dropout_rate=0.0 --encoded_size=14 --encoder_layers=1 --model_timesteps=4 --timestep_layers=8 --use_residual=1 --use_rnn=1
 echo "python3 -m tensorboard.main --logdir $JOB_DIR"

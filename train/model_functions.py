@@ -103,9 +103,6 @@ def create_models():
   print("encoder", encoder.layers)
 
   # The first timestep is the encoded, and the rest are 0s
-  # encoded_padded = tf.zeros([FLAGS.batch_size, FLAGS.model_timesteps] + input_shape)
-  # encoded_padded[:,0] = encoder(input_layer)
-
   encoded = encoder(input_layer)
   print("encoded", encoded)
 
@@ -132,18 +129,6 @@ def create_models():
   intermediates = [encoded] + [tf.squeeze(x, axis=1) for x in intermediates]
 
   print("intermediates", intermediates)
-  #intermediates = [encoder(input_layer)]
-
-  # if FLAGS.use_rnn:
-  #   timestep_model = create_timestep_model()
-  # for i in range(FLAGS.model_timesteps):
-  #   if not FLAGS.use_rnn:
-  #     timestep_model = create_timestep_model('_'+str(i))
-  #
-  #   timestep = timestep_model(intermediates[-1])
-  #   if FLAGS.use_residual:
-  #     timestep += intermediates[-1]
-  #   intermediates.append(timestep)
 
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
   model.summary()

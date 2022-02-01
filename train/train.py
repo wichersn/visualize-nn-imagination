@@ -332,25 +332,25 @@ def main(_):
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'w') as out_file:
     out_file.write(FLAGS.flags_into_string())
 
-  print("task_infos", task_infos, flush=True)
-  print("Full model training")
-  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
-                    adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
-
-  task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
-  if not task_good_enough:
-    save_metric_result(-task_metric_result, "final_metric_result")
-    return
-
-  save_model(encoder, 'encoder')
-  save_model(decoder, 'decoder')
-  save_model(model, 'model')
-  if FLAGS.task == 'count':
-    save_model(decoder_counter, 'decoder_counter')
-  if FLAGS.task == 'patch':
-    save_model(decoder_patch, 'decoder_patch')
-  if FLAGS.task == 'grid':
-    save_model(decoder_grid, 'decoder_grid')
+  # print("task_infos", task_infos, flush=True)
+  # print("Full model training")
+  # get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
+  #                   adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
+  #
+  # task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
+  # if not task_good_enough:
+  #   save_metric_result(-task_metric_result, "final_metric_result")
+  #   return
+  #
+  # save_model(encoder, 'encoder')
+  # save_model(decoder, 'decoder')
+  # save_model(model, 'model')
+  # if FLAGS.task == 'count':
+  #   save_model(decoder_counter, 'decoder_counter')
+  # if FLAGS.task == 'patch':
+  #   save_model(decoder_patch, 'decoder_patch')
+  # if FLAGS.task == 'grid':
+  #   save_model(decoder_grid, 'decoder_grid')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
@@ -381,24 +381,6 @@ def main(_):
   if FLAGS.task == 'count':
     task_gen = get_gens(decoder_counter, model_results, False)
     save_np(task_gen, "task_gen")
-
-  task_infos[0]['target_metric_val'] = FLAGS.target_pred_state_metric_val
-  if FLAGS.game_timesteps == FLAGS.model_timesteps:
-    def fine_tune_new_decoder(train_indexes, name):
-      print("Train decoder {}".format(name))
-      task_infos[0]["train_indexes"] = train_indexes
-      task_infos[0]["decoder"] = get_stop_grad_dec(2, "dec_{}".format(name), 4)
-      print("task infos", task_infos)
-      get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=False,
-                        adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder_{}'.format(name),
-                      max_train_steps=int(FLAGS.max_dec_train_steps))()
-      new_dec_gen_boards = get_gens(task_infos[0]["decoder"], model_results, True)
-      save_np(new_dec_gen_boards, "gen_boards_{}".format(name))
-
-    fine_tune_new_decoder({0, FLAGS.model_timesteps}, "first_last")
-    fine_tune_new_decoder(set(range(FLAGS.model_timesteps+1)), "all")
-    for dec_ts in range(FLAGS.model_timesteps + 1):
-      fine_tune_new_decoder({dec_ts}, dec_ts)
 
 if __name__ == '__main__':
   app.run(main)
