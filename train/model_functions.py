@@ -30,6 +30,9 @@ flags.DEFINE_integer('decoder_counter_strides', 2, 'Only used for the count cell
 flags.DEFINE_integer('use_residual', 1, '')
 flags.DEFINE_integer('use_rnn', 1, '')
 flags.DEFINE_float('dropout_rate', 0.0, '')
+flags.DEFINE_integer('discrim_layers', 4, '')
+flags.DEFINE_integer('discrim_layer_size', 4, '')
+flags.DEFINE_float('discrim_drop_rate', .3, '')
 
 leak_relu = tf.keras.layers.LeakyReLU
 
@@ -57,7 +60,7 @@ def get_stop_grad_dec(decoder_layers, name, encoded_size=None):
   )
   add_decoder_layers(decoder, decoder_layers, encoded_size)
   decoder.add(
-    tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+    tf.keras.layers.Conv2D(1, 3, activation="sigmoid", padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   print(name, decoder.layers)
   return decoder
 
@@ -88,7 +91,7 @@ def create_count_decoder():
 def create_decoder(name, decoder_layers):
   decoder = tf.keras.Sequential(name=name)
   add_decoder_layers(decoder, decoder_layers)
-  decoder.add(tf.keras.layers.Conv2D(1, 3, activation=None, padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
+  decoder.add(tf.keras.layers.Conv2D(1, 3, activation="sigmoid", padding='same', kernel_regularizer=tf.keras.regularizers.l2(1)))
   maybe_load_model(decoder, name)
   return decoder
 
@@ -133,21 +136,12 @@ def create_models():
   model = tf.keras.Model(inputs=input_layer, outputs=intermediates)
   model.summary()
 
-  discriminator = tf.keras.Sequential(
-      [
-        tf.keras.layers.Conv2D(4, 3, strides=2, padding='same', activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Conv2D(8, 3, strides=2, padding='same', activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Conv2D(16, 3, strides=2, padding='same', activation=leak_relu()),
-        tf.keras.layers.Dropout(0.3),
-
-        tf.keras.layers.Flatten(),
-        tf.keras.layers.Dense(1),
-      ], name="discriminator",
-  )
+  discriminator = tf.keras.Sequential(name="discriminator")
+  for i in range(FLAGS.discrim_layers):
+    discriminator.add(tf.keras.layers.Conv2D(FLAGS.discrim_layer_size*(i+1), 3, strides=2, padding='same', activation=leak_relu()))
+    discriminator.add(tf.keras.layers.Dropout(FLAGS.discrim_drop_rate))
+  discriminator.add(tf.keras.layers.Flatten())
+  discriminator.add(tf.keras.layers.Dense(1))
 
   adver_decoder = get_stop_grad_dec(FLAGS.adver_decoder_layers, "adver_decoder")
   maybe_load_model(encoder, 'encoder')

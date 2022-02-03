@@ -27,6 +27,18 @@ trainingInput:
     maxTrials: 10
     maxParallelTrials: 5
     params:
+      - parameterName: learning_rate
+        type: DOUBLE
+        minValue: .00001
+        maxValue: .001
+        scaleType: UNIT_LOG_SCALE
+
+      - parameterName: lr_decay_rate_per1M_steps
+        type: DOUBLE
+        minValue: .1
+        maxValue: .7
+        scaleType: UNIT_LOG_SCALE
+
       - parameterName: adver_decoder_layers
         type: INTEGER
         minValue: 3
@@ -35,22 +47,34 @@ trainingInput:
 
       - parameterName: adver_weight
         type: DOUBLE
-        minValue: 0.01
-        maxValue: .5
-        scaleType: UNIT_LOG_SCALE
+        minValue: 0.1
+        maxValue: 2.0
+        scaleType: UNIT_LINEAR_SCALE
 
-#      - parameterName: adver_decoder_layers
-#        type: INTEGER
-#        minValue: 2
-#        maxValue: 3
-#        scaleType: UNIT_LINEAR_SCALE
-#
-#      - parameterName: adver_weight
-#        type: DOUBLE
-#        minValue: 0.031
-#        maxValue: 0.037
-#        scaleType: UNIT_LOG_SCALE
+      - parameterName: discrim_layers
+        type: INTEGER
+        minValue: 2
+        maxValue: 5
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: discrim_layer_size
+        type: INTEGER
+        minValue: 3
+        maxValue: 12
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: discrim_drop_rate
+        type: DOUBLE
+        minValue: 0.
+        maxValue: .5
+        scaleType: UNIT_LINEAR_SCALE
+
+      - parameterName: dec_enc_loss_amount
+        type: DOUBLE
+        minValue: 0.0001
+        maxValue: 0.01
+        scaleType: UNIT_LOG_SCALE
 
       - parameterName: model_save_dir
         type: CATEGORICAL
-        categoricalValues: ["gs://visualize-nn-imagination-runs/gol4ts_lstm_41874536/2"]
+        categoricalValues: ["gs://visualize-nn-imagination-runs/count3ts_count3ts_lstm_41870132/2"]

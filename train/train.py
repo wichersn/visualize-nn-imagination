@@ -48,7 +48,7 @@ flags.DEFINE_integer('batch_size', 128, '')
 flags.DEFINE_float('learning_rate', .001, '')
 flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
-flags.DEFINE_float('dec_enc_loss_amount', 0.0, '')
+flags.DEFINE_float('dec_enc_loss_post_train', 0.0, '')
 flags.DEFINE_float('adver_weight', 1.0, '')
 
 flags.DEFINE_alias('job-dir', 'job_dir')
@@ -100,14 +100,16 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
                                                                decay_steps=100000,
                                                                decay_rate=FLAGS.lr_decay_rate_per1M_steps)
   optimizer = tf.keras.optimizers.Adam(lr_schedule)
-  discriminator_opt = tf.keras.optimizers.Adam()
+  discriminator_opt = tf.keras.optimizers.Adam(lr_schedule)
 
   def calc_discriminator_loss(discrim_on_real, discrim_on_gen):
-    real_loss = loss_fn(tf.ones_like(discrim_on_real), discrim_on_real)
-    discrim_acc_metric.update_state(tf.ones_like(discrim_on_real), discrim_on_real)
+    real_labels = tf.random.uniform(discrim_on_real.shape, 0.0, .3)
+    real_loss = bin_crossentropy_loss(real_labels, discrim_on_real)
+    discrim_acc_metric.update_state(tf.zeros_like(discrim_on_real), discrim_on_real)
 
-    fake_loss = loss_fn(tf.zeros_like(discrim_on_gen), discrim_on_gen)
-    discrim_acc_metric.update_state(tf.zeros_like(discrim_on_gen), discrim_on_gen)
+    fake_labels = tf.random.uniform(discrim_on_real.shape, 0.7, 1.0)
+    fake_loss = bin_crossentropy_loss(fake_labels, discrim_on_gen)
+    discrim_acc_metric.update_state(tf.ones_like(discrim_on_gen), discrim_on_gen)
     total_loss = real_loss + fake_loss
     return total_loss
 
@@ -141,9 +143,10 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
           pred = task_info['decoder'](model_outputs[model_i])
 
           flatten_fn = tf.keras.layers.Flatten()
-          if task_info["name"] == GOL_NAME and FLAGS.dec_enc_loss_amount > 1e-20:
+          if task_info["name"] == GOL_NAME and FLAGS.dec_enc_loss_post_train > 1e-20:
+            # stop_grad_pred = task_info['decoder'](model_outputs[model_i])
             pred_enc = encoder(pred)
-            dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(model_outputs[model_i]), flatten_fn(pred_enc))) + 1
+            dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(tf.stop_gradient(model_outputs[model_i])), flatten_fn(pred_enc))) + 1
 
           task_info['metrics'][model_i].update_state(batch_targets, pred)
           if model_i in task_info['train_indexes']:
@@ -155,8 +158,8 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
             discrim_on_pred = discriminator(pred)
             discrim_on_real = discriminator(adver_batch[:,0])
             discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
-            generator_loss = loss_fn(tf.ones_like(discrim_on_pred), discrim_on_pred)
-            gen_acc_metric.update_state(tf.ones_like(discrim_on_pred), discrim_on_pred)
+            generator_loss = bin_crossentropy_loss(tf.zeros_like(discrim_on_pred), discrim_on_pred)
+            gen_acc_metric.update_state(tf.zeros_like(discrim_on_pred), discrim_on_pred)
             loss += generator_loss * float(step_i / max_train_steps) * FLAGS.adver_weight
             ran_discrim = True
 
@@ -164,7 +167,7 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       for task_info in task_infos:
         reg_loss += sum(task_info['decoder'].losses)
       loss += reg_loss * FLAGS.reg_amount
-      loss += dec_enc_loss * FLAGS.dec_enc_loss_amount
+      loss += dec_enc_loss * FLAGS.dec_enc_loss_post_train
       reg_loss_metric.update_state([reg_loss])
       dec_enc_loss_metric.update_state([dec_enc_loss])
       loss_metric.update_state([loss])
@@ -230,6 +233,9 @@ def is_task_good_enough(task_infos, metric_stop_task_name, target_val_name):
     if metric_stop_task_name == task_info["name"]:
       metric_stop_task = task_info
 
+  if len(metric_stop_task['train_indexes']) == 0:
+    return False, 1
+
   metric_index = max(metric_stop_task['train_indexes'])
   stop_metric = metric_stop_task['metrics'][metric_index]
 
@@ -251,7 +257,7 @@ def get_gens(decoder, model_results, is_img):
     gen_boards = np.squeeze(gen_boards, 2)
   return gen_boards
 
-loss_fn = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
+bin_crossentropy_loss = tf.keras.losses.BinaryCrossentropy(from_logits=True, label_smoothing=0)
 mse_loss = tf.keras.losses.MeanSquaredError()
 
 def save_metric_result(metric_result, metric_name):
@@ -355,9 +361,9 @@ def main(_):
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
   print("task infos adversarial", task_infos)
-  print("Training Only Decoder", flush=True)
-  get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
-                    adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.adver_train_steps))()
+  # print("Training Only Decoder", flush=True)
+  # get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=discriminator, should_train_model=False,
+  #                   adversarial_task_name=None, metric_stop_task_name=GOL_NAME, metric_prefix='train_decoder', max_train_steps=int(FLAGS.adver_train_steps))()
 
   task_infos[0]['target_metric_val'] = 0.0
   print("Training Only Decoder Adversarial")
