@@ -42,7 +42,7 @@ trainingInput:
       - parameterName: adver_decoder_layers
         type: INTEGER
         minValue: 3
-        maxValue: 6
+        maxValue: 5
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: adver_weight
@@ -54,12 +54,12 @@ trainingInput:
       - parameterName: discrim_layers
         type: INTEGER
         minValue: 2
-        maxValue: 5
+        maxValue: 3
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: discrim_layer_size
         type: INTEGER
-        minValue: 3
+        minValue: 5
         maxValue: 12
         scaleType: UNIT_LINEAR_SCALE
 
@@ -69,9 +69,9 @@ trainingInput:
         maxValue: .5
         scaleType: UNIT_LINEAR_SCALE
 
-      - parameterName: dec_enc_loss_amount
+      - parameterName: dec_enc_loss_post_train
         type: DOUBLE
-        minValue: 0.0001
+        minValue: 0.0000000001
         maxValue: 0.01
         scaleType: UNIT_LOG_SCALE
 

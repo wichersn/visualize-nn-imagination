@@ -50,6 +50,7 @@ flags.DEFINE_float('lr_decay_rate_per1M_steps', .9, '')
 flags.DEFINE_float('reg_amount', 0.0, '')
 flags.DEFINE_float('dec_enc_loss_post_train', 0.0, '')
 flags.DEFINE_float('adver_weight', 1.0, '')
+flags.DEFINE_integer('train_full_model', 1, '')
 
 flags.DEFINE_alias('job-dir', 'job_dir')
 
@@ -137,37 +138,36 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
       for model_i in range(FLAGS.model_timesteps+1):
         game_i = model_i * FLAGS.game_timesteps // FLAGS.model_timesteps
 
-        for task_info in task_infos:
-          batch_targets = task_info['data_fn'](batch)[:, game_i]
+        for task_info_ in task_infos:
+          batch_targets = task_info_['data_fn'](batch)[:, game_i]
 
-          pred = task_info['decoder'](model_outputs[model_i])
+          pred = task_info_['decoder'](model_outputs[model_i])
 
           flatten_fn = tf.keras.layers.Flatten()
-          if task_info["name"] == GOL_NAME and FLAGS.dec_enc_loss_post_train > 1e-20:
-            # stop_grad_pred = task_info['decoder'](model_outputs[model_i])
+          if task_info_["name"] == GOL_NAME and task_info_['dec_enc_loss'] > 1e-20:
             pred_enc = encoder(pred)
             dec_enc_loss += tf.reduce_mean(tf.keras.losses.cosine_similarity(flatten_fn(tf.stop_gradient(model_outputs[model_i])), flatten_fn(pred_enc))) + 1
 
-          task_info['metrics'][model_i].update_state(batch_targets, pred)
-          if model_i in task_info['train_indexes']:
-            current_loss = task_info['loss_fn'](batch_targets, pred)
+          task_info_['metrics'][model_i].update_state(batch_targets, pred)
+          if model_i in task_info_['train_indexes']:
+            current_loss = task_info_['loss_fn'](batch_targets, pred)
             loss += current_loss
-            task_info['loss_metric'].update_state(current_loss)
+            task_info_['loss_metric'].update_state(current_loss)
 
-          elif task_info["name"] == adversarial_task_name:
+          elif task_info_["name"] == adversarial_task_name:
             discrim_on_pred = discriminator(pred)
             discrim_on_real = discriminator(adver_batch[:,0])
             discriminator_loss += calc_discriminator_loss(discrim_on_real, discrim_on_pred)
             generator_loss = bin_crossentropy_loss(tf.zeros_like(discrim_on_pred), discrim_on_pred)
             gen_acc_metric.update_state(tf.zeros_like(discrim_on_pred), discrim_on_pred)
-            loss += generator_loss * float(step_i / max_train_steps) * FLAGS.adver_weight
+            loss += generator_loss * FLAGS.adver_weight * tf.cast(step_i, tf.float32) / float(max_train_steps)
             ran_discrim = True
 
       reg_loss = sum(model.losses)
-      for task_info in task_infos:
-        reg_loss += sum(task_info['decoder'].losses)
+      for task_info_ in task_infos:
+        reg_loss += sum(task_info_['decoder'].losses)
       loss += reg_loss * FLAGS.reg_amount
-      loss += dec_enc_loss * FLAGS.dec_enc_loss_post_train
+      loss += dec_enc_loss * task_info_['dec_enc_loss']
       reg_loss_metric.update_state([reg_loss])
       dec_enc_loss_metric.update_state([dec_enc_loss])
       loss_metric.update_state([loss])
@@ -175,8 +175,8 @@ def get_train_model(task_infos, model, encoder, datas, discriminator, should_tra
     trainable_weights = []
     if should_train_model:
       trainable_weights += model.trainable_weights
-    for task_info in task_infos:
-      trainable_weights += task_info['decoder'].trainable_weights
+    for task_info_ in task_infos:
+      trainable_weights += task_info_['decoder'].trainable_weights
 
     grads = tape.gradient(loss, trainable_weights)
     grads_weights = list(zip(grads, trainable_weights))
@@ -318,47 +318,49 @@ def main(_):
   task_infos = [
     {'name': GOL_NAME, 'train_indexes': gol_train_indexes, 'data_fn': lambda x: x, 'decoder': decoder,
       'loss_fn': mse_loss, 'metric_class': lambda :  AccuracyInverseMetric(1), 'target_metric_val': FLAGS.target_pred_state_metric_val,
-     'early_metric_val': FLAGS.early_pred_state_metric_val}]
+     'early_metric_val': FLAGS.early_pred_state_metric_val, 'dec_enc_loss':0}]
   if FLAGS.task == 'count':
     task_infos.append(
       {'name': 'count', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells, 'decoder': decoder_counter,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.board_size), 'target_metric_val': FLAGS.target_task_metric_val,
-       'early_metric_val': FLAGS.early_task_metric_val})
+       'early_metric_val': FLAGS.early_task_metric_val, 'dec_enc_loss':0})
   if FLAGS.task == 'patch':
     task_infos.append(
       {'name': 'patch', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_patch, 'decoder': decoder_patch,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.patch_size), 'target_metric_val': FLAGS.target_task_metric_val,
-       'early_metric_val': FLAGS.early_task_metric_val})
+       'early_metric_val': FLAGS.early_task_metric_val, 'dec_enc_loss':0})
   if FLAGS.task == 'grid':
     task_infos.append(
       {'name': 'grid', 'train_indexes': task_train_indexes, 'data_fn': num_black_cells_in_grid, 'decoder': decoder_grid,
       'loss_fn': mse_loss, 'metric_class': lambda : AccuracyInverseMetric(FLAGS.grid_size), 'target_metric_val': FLAGS.target_task_metric_val,
-       'early_metric_val': FLAGS.early_task_metric_val})
+       'early_metric_val': FLAGS.early_task_metric_val, 'dec_enc_loss':0})
 
   with tf.io.gfile.GFile(os.path.join(FLAGS.job_dir, 'flagfile.txt'), 'w') as out_file:
     out_file.write(FLAGS.flags_into_string())
 
-  # print("task_infos", task_infos, flush=True)
-  # print("Full model training")
-  # get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
-  #                   adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
-  #
-  # task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
-  # if not task_good_enough:
-  #   save_metric_result(-task_metric_result, "final_metric_result")
-  #   return
-  #
-  # save_model(encoder, 'encoder')
-  # save_model(decoder, 'decoder')
-  # save_model(model, 'model')
-  # if FLAGS.task == 'count':
-  #   save_model(decoder_counter, 'decoder_counter')
-  # if FLAGS.task == 'patch':
-  #   save_model(decoder_patch, 'decoder_patch')
-  # if FLAGS.task == 'grid':
-  #   save_model(decoder_grid, 'decoder_grid')
+  print("task_infos", task_infos, flush=True)
+  if FLAGS.train_full_model:
+    print("Full model training")
+    get_train_model(task_infos=task_infos, model=model, encoder=encoder, datas=datas, discriminator=None, should_train_model=True,
+                      adversarial_task_name=None, metric_stop_task_name=FLAGS.task, metric_prefix='full_model')()
+
+    task_good_enough, task_metric_result = is_task_good_enough(task_infos, FLAGS.task, 'target_metric_val')
+    if not task_good_enough:
+      save_metric_result(-task_metric_result, "final_metric_result")
+      return
+
+    save_model(encoder, 'encoder')
+    save_model(decoder, 'decoder')
+    save_model(model, 'model')
+    if FLAGS.task == 'count':
+      save_model(decoder_counter, 'decoder_counter')
+    if FLAGS.task == 'patch':
+      save_model(decoder_patch, 'decoder_patch')
+    if FLAGS.task == 'grid':
+      save_model(decoder_grid, 'decoder_grid')
 
   task_infos[0]['decoder'] = adver_decoder  # Use a different decoder
+  task_infos[0]['dec_enc_loss'] = FLAGS.dec_enc_loss_post_train
   task_infos = [task_infos[0]]  # Only train the board task for adversarial.
   print("task infos adversarial", task_infos)
   # print("Training Only Decoder", flush=True)

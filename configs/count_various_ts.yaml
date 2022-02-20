@@ -20,9 +20,8 @@ trainingInput:
       count: 1
       type: NVIDIA_TESLA_P100
   hyperparameters:
-    goal: MAXIMIZE
-    hyperparameterMetricTag: final_metric_result
-    maxTrials: 20
+    algorithm: RANDOM_SEARCH
+    maxTrials: 40
     maxParallelTrials: 5
     params:
       - parameterName: task
@@ -31,14 +30,14 @@ trainingInput:
 
       - parameterName: game_timesteps
         type: INTEGER
-        minValue: 3
-        maxValue: 3
+        minValue: 2
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: model_timesteps
         type: INTEGER
-        minValue: 3
-        maxValue: 3
+        minValue: 2
+        maxValue: 4
         scaleType: UNIT_LINEAR_SCALE
 
       - parameterName: board_size
